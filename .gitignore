@@ -1,0 +1,24 @@
+# Virtual Environment
+epublishing/
+venv/
+.venv/
+env/
+
+# Dependencies
+epubcheck-5.1.0/
+
+# Output and Temp Files
+reports/
+temp_render/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# User Data
+input/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store

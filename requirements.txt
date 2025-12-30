@@ -1,0 +1,6 @@
+lxml
+httpx
+openai
+playwright
+beautifulsoup4
+colorama

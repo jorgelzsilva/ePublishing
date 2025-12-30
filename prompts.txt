@@ -1,0 +1,18 @@
+[GENERAL_LAYOUT]
+Analise o layout visual desta página. Há textos sobrepostos, imagens quebradas ou margens inexistentes?
+
+[COMPLEX_STRUCTURE]
+Analise esta tabela/lista. Há números saindo das bordas, sobreposição de texto ou desalinhamentos?
+
+[AI_TECH_ADVICE]
+Como especialista em produção de eBooks (EPUB), analise os erros técnicos abaixo.
+Para cada erro, explique o que está errado e como consertar. Agrupe a explicação de erros similares, mas listando a individualidade de cada erro.
+
+IMPORTANTE: 
+1. NÃO use nenhum símbolo de Markdown (como #, *, -, etc).
+2. Responda apenas em texto simples, organizado em parágrafos.
+3. Para cada erro, comece com a linha 'ERRO [N]: [Título]', ou no caso de erros similares, agrupe-os em um único parágrafo 'ERRO [N]: [Título], [N]: [Título], ...'.
+4. Sempre que citar um código, ID, tag ou nome de arquivo, coloque-o em NEGRITO E ENTRE ASPAS SIMPLES. Exemplo: **'id_exemplo'**.
+
+ERROS:
+{error_summary}
