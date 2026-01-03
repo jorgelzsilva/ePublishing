@@ -203,7 +203,6 @@ def get_ai_tech_advice(errors):
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3
         )
-        )
         
         content = response.choices[0].message.content
         usage = {
