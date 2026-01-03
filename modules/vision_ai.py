@@ -163,10 +163,12 @@ def get_ai_tech_advice(errors):
 
     error_summary = ""
     for idx, e in enumerate(critical_errors, 1):
-        error_summary += f"{idx}. {e['severity']} em {e['location']}: {e['text']}\n"
+        error_summary += f"ERRO {idx}:\n"
+        error_summary += f"Local: {e['location']}\n"
+        error_summary += f"Mensagem: {e['text']}\n"
         if e.get('snippet'):
-            error_summary += f"   Trecho de código: {e['snippet']}\n"
-        error_summary += "-"*20 + "\n"
+            error_summary += f"Snippet: {e['snippet']}\n"
+        error_summary += "-"*10 + "\n"
 
     prompt_template = load_prompt("AI_TECH_ADVICE")
     prompt = prompt_template.format(error_summary=error_summary)
