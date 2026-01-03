@@ -174,10 +174,17 @@ def get_ai_tech_advice(errors):
     Envia lista de erros do EPubCheck para a IA e retorna diagnóstico e correção.
     """
     if not errors:
+        print(f"{Fore.RED}    [DEBUG] Nenhuma mensagem recebida do EPubCheck.")
         return {"content": "", "model": "N/A", "usage": None}
     
+    # DEBUG: Ver as severidades disponíveis
+    severities = set(e.get('severity') for e in errors)
+    print(f"{Fore.WHITE}    [DEBUG] Severidades encontradas nos logs: {severities}")
+
     # Filtra apenas erros importantes para não sobrecarregar
-    critical_errors = [e for e in errors if e['severity'] in ['FATAL', 'ERROR']]
+    critical_errors = [e for e in errors if e.get('severity', '').upper() in ['FATAL', 'ERROR']]
+    print(f"{Fore.WHITE}    [DEBUG] Erros críticos após filtragem: {len(critical_errors)}")
+
     if not critical_errors:
         return {"content": "", "model": "N/A", "usage": None}
 
@@ -190,8 +197,8 @@ def get_ai_tech_advice(errors):
             error_summary += f"Snippet: {e['snippet']}\n"
         error_summary += "-"*10 + "\n"
 
-    prompt_template = load_prompt("AI_TECH_ADVICE")
-    prompt = prompt_template.format(error_summary=error_summary)
+    system_prompt = load_prompt("AI_TECH_ADVICE")
+    user_content = f"--- LOGS DO EPUBCHECK ---\n{error_summary}\n--- FIM DOS LOGS ---"
 
     print(f"{Fore.CYAN}    [DEBUG] Erros enviados para IA:\n{error_summary}")
 
@@ -200,7 +207,10 @@ def get_ai_tech_advice(errors):
         
         response = client.chat.completions.create(
             model="qwen3-vl-8b",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ],
             temperature=0.3
         )
         
