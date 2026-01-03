@@ -143,21 +143,41 @@ def analyze_image_with_ai(img_path, prompt):
                 ]
             }]
         )
-        return response.choices[0].message.content, response.model
+        
+        content = response.choices[0].message.content
+        usage = {
+            "prompt_tokens": response.usage.prompt_tokens,
+            "completion_tokens": response.usage.completion_tokens,
+            "total_tokens": response.usage.total_tokens
+        }
+        
+        if not content:
+            print(f"{Fore.RED}    [DEBUG] Resposta da IA vazia para análise visual.")
+            
+        return {
+            "content": content,
+            "model": response.model,
+            "usage": usage
+        }
     except Exception as e:
-        return f"Erro na API de IA: {e}", "Erro/Desconhecido"
+        print(f"{Fore.RED}    [DEBUG] Erro na API de IA (Visual): {e}")
+        return {
+            "content": f"Erro na API de IA: {e}",
+            "model": "Erro/Desconhecido",
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        }
 
 def get_ai_tech_advice(errors):
     """
     Envia lista de erros do EPubCheck para a IA e retorna diagnóstico e correção.
     """
     if not errors:
-        return "", "N/A"
+        return {"content": "", "model": "N/A", "usage": None}
     
     # Filtra apenas erros importantes para não sobrecarregar
     critical_errors = [e for e in errors if e['severity'] in ['FATAL', 'ERROR']]
     if not critical_errors:
-        return "", "N/A"
+        return {"content": "", "model": "N/A", "usage": None}
 
     error_summary = ""
     for idx, e in enumerate(critical_errors, 1):
@@ -173,11 +193,35 @@ def get_ai_tech_advice(errors):
 
     try:
         print(f"{Fore.BLUE}    [IA] Enviando logs para conselhos técnicos...")
+        # DEBUG: print(f"--- PROMPT ENVIADO ---\n{prompt}\n---------------------")
+        
         response = client.chat.completions.create(
             model="qwen3-vl-8b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3
         )
-        return response.choices[0].message.content, response.model
+        
+        content = response.choices[0].message.content
+        usage = {
+            "prompt_tokens": response.usage.prompt_tokens,
+            "completion_tokens": response.usage.completion_tokens,
+            "total_tokens": response.usage.total_tokens
+        }
+
+        if not content:
+            print(f"{Fore.RED}    [DEBUG] Resposta da IA vazia para conselhos técnicos.")
+            # Se a resposta vier vazia mas houver erros, algo no modelo local falhou ou o prompt barrou tudo.
+            content = "A IA não retornou sugestões para os erros fornecidos. Verifique se o modelo está carregado corretamente ou se os logs contêm caracteres que impedem a análise."
+
+        return {
+            "content": content,
+            "model": response.model,
+            "usage": usage
+        }
     except Exception as ex:
-        return f"<p style='color:red'>Erro ao consultar IA para conselhos técnicos: {str(ex)}</p>", "Erro/Desconhecido"
+        print(f"{Fore.RED}    [DEBUG] Erro na API de IA (Conselhos): {ex}")
+        return {
+            "content": f"<p style='color:red'>Erro ao consultar IA para conselhos técnicos: {str(ex)}</p>",
+            "model": "Erro/Desconhecido",
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        }

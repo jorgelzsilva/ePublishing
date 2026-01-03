@@ -175,6 +175,11 @@ def generate_html_report(epub_name, data):
             <p style="margin-top: 10px; font-size: 0.9em; color: #7f8c8d;">
                 <strong>Créditos:</strong> {data.get('typesetter', 'Não identificado')}
             </p>
+            {f'''
+            <p style="margin-top: 5px; font-size: 0.85em; color: #95a5a6;">
+                <strong>Uso de Tokens (Total):</strong> {data.get('total_tokens', 0)} (Prompt: {data.get('total_prompt_tokens', 0)}, Resposta: {data.get('total_completion_tokens', 0)})
+            </p>
+            ''' if data.get('total_tokens') else ""}
         </div>
 
         <div class="card">
@@ -191,6 +196,11 @@ def generate_html_report(epub_name, data):
             <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 5px solid #3498db; font-size: 0.95em; line-height: 1.6;">
                 {data.get('ai_advice', 'Nenhum erro crítico para análise.')}
             </div>
+            {f'''
+            <div style="margin-top: 10px; font-size: 0.8em; color: #7f8c8d; text-align: right;">
+                Tokens: {data.get('advice_tokens', 0)}
+            </div>
+            ''' if data.get('advice_tokens') else ""}
         </div>
         ''' if data.get('ai_advice') else ""}
 
@@ -209,6 +219,7 @@ def generate_html_report(epub_name, data):
             <div style="margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px;">
                 <h3>📍 {item.get('location', 'N/A')} <span class="badge" style="background:#8e44ad">{item.get('type', 'Geral')}</span> <small style="color: #7f8c8d; font-size: 0.8em; font-weight: normal;">(IA: {item.get('ai_model', 'N/A')})</small></h3>
                 <p><strong>Parecer da IA:</strong> {item.get('analysis', 'Sem análise')}</p>
+                {f'<p style="font-size: 0.8em; color: #7f8c8d;">Tokens: {item.get("tokens", 0)}</p>' if item.get('tokens') else ""}
                 {f'<img src="{item["image_url"]}" class="screenshot-thumb" onclick="openModal(this.src)">' if item.get('image_url') else '<p><em>Sem captura de tela.</em></p>'}
             </div>
             """ for item in data.get('vision_results', [])])}
@@ -259,6 +270,10 @@ def generate_html_report(epub_name, data):
                 <tr><td><strong>6. Visão IA:</strong></td><td>{data['timings'].get('vision_ai', 0):.2f}s</td></tr>
                 <tr><td><strong>IA (Conselhos):</strong></td><td>{data['timings'].get('ai_advice', 0):.2f}s</td></tr>
                 <tr><td><strong>7. Interatividade:</strong></td><td>{data['timings'].get('interactivity', 0):.2f}s</td></tr>
+                <tr style="border-top: 2px solid #eee;">
+                    <td><strong>Tokens Ganhos:</strong></td>
+                    <td>{data.get('total_tokens', 0)}</td>
+                </tr>
                 <tr style="border-top: 2px solid #eee; font-size: 1.1em;">
                     <td><strong>TEMPO TOTAL:</strong></td>
                     <td style="color: #27ae60; font-weight: bold;">{data['timings'].get('total', 0):.2f}s</td>
@@ -333,9 +348,24 @@ def process_single_epub(epub_path):
 
     # 6. Visão Computacional (IA Qwen3 VL)
     s6 = time.time()
+    report_data['total_prompt_tokens'] = 0
+    report_data['total_completion_tokens'] = 0
+    report_data['total_tokens'] = 0
+
     if ENABLE_VISION_AI:
         print(f"{Fore.YELLOW}[6/7] Executando análise de visão computacional (Amostragem)...")
-        report_data['vision_results'] = check_visual_layout(epub_path, max_items=3)
+        raw_vision_results = check_visual_layout(epub_path, max_items=3)
+        vision_processed = []
+        for v in raw_vision_results:
+            if isinstance(v, dict) and "usage" in v:
+                u = v["usage"]
+                report_data['total_prompt_tokens'] += u.get("prompt_tokens", 0)
+                report_data['total_completion_tokens'] += u.get("completion_tokens", 0)
+                report_data['total_tokens'] += u.get("total_tokens", 0)
+                v["tokens"] = u.get("total_tokens", 0)
+                v["analysis"] = v["content"] # No dict, content é o texto
+            vision_processed.append(v)
+        report_data['vision_results'] = vision_processed
     else:
         print(f"{Fore.WHITE}[6/7] Análise visual desativada.")
         report_data['vision_results'] = []
@@ -344,7 +374,17 @@ def process_single_epub(epub_path):
     # Adicional: Conselhos da IA para erros técnicos
     print(f"{Fore.BLUE}[IA] Consultando IA para conselhos técnicos sobre o EPubCheck...")
     s_ia = time.time()
-    raw_advice, advice_model = get_ai_tech_advice(report_data['epubcheck']['messages'])
+    ia_res = get_ai_tech_advice(report_data['epubcheck']['messages'])
+    raw_advice = ia_res.get("content", "")
+    advice_model = ia_res.get("model", "N/A")
+    usage = ia_res.get("usage")
+    
+    if usage:
+        report_data['total_prompt_tokens'] += usage.get("prompt_tokens", 0)
+        report_data['total_completion_tokens'] += usage.get("completion_tokens", 0)
+        report_data['total_tokens'] += usage.get("total_tokens", 0)
+        report_data['advice_tokens'] = usage.get("total_tokens", 0)
+
     report_data['ai_advice_model'] = advice_model
     if raw_advice:
         import re
