@@ -55,8 +55,8 @@ def validate_limitador_and_structures(epub_path):
                     content = f.read().decode('utf-8', errors='ignore')
                     
                     file_log = []
-                    # 1. Checagem da div .limitador
-                    if 'class="limitador"' not in content and "class='limitador'" not in content:
+                    # 1. Checagem da div .limitador (Case-insensitive e suportando múltiplas classes)
+                    if not re.search(r'class\s*=\s*["\'][^"\']*limitador[^"\']*["\']', content, re.IGNORECASE):
                         analysis_results["missing_limitador"].append(html)
                         file_log.append("❌ Div .limitador ausente")
                     else:
