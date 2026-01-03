@@ -259,10 +259,6 @@ def generate_html_report(epub_name, data):
                 <tr><td><strong>6. Visão IA:</strong></td><td>{data['timings'].get('vision_ai', 0):.2f}s</td></tr>
                 <tr><td><strong>IA (Conselhos):</strong></td><td>{data['timings'].get('ai_advice', 0):.2f}s</td></tr>
                 <tr><td><strong>7. Interatividade:</strong></td><td>{data['timings'].get('interactivity', 0):.2f}s</td></tr>
-                <tr style="border-top: 2px solid #eee;">
-                    <td><strong>Tokens Ganhos:</strong></td>
-                    <td>{data.get('total_tokens', 0)}</td>
-                </tr>
                 <tr style="border-top: 2px solid #eee; font-size: 1.1em;">
                     <td><strong>TEMPO TOTAL:</strong></td>
                     <td style="color: #27ae60; font-weight: bold;">{data['timings'].get('total', 0):.2f}s</td>
