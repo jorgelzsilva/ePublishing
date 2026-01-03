@@ -128,14 +128,13 @@ def check_visual_layout(epub_path, max_items=3):
         return [{"analysis": f"Erro técnico: {str(e)}", "image_url": None}]
 
 def analyze_image_with_ai(img_path, prompt):
-    model_name = "qwen3-vl"
     try:
         with open(img_path, "rb") as image_file:
             img_b64 = base64.b64encode(image_file.read()).decode('utf-8')
 
-        print(f"{Fore.BLUE}    [IA] Enviando captura para {model_name}...")
+        print(f"{Fore.BLUE}    [IA] Enviando captura para análise visual...")
         response = client.chat.completions.create(
-            model=model_name, 
+            model="qwen3-vl", 
             messages=[{
                 "role": "user",
                 "content": [
@@ -144,22 +143,21 @@ def analyze_image_with_ai(img_path, prompt):
                 ]
             }]
         )
-        return response.choices[0].message.content, model_name
+        return response.choices[0].message.content, response.model
     except Exception as e:
-        return f"Erro na API de IA: {e}", model_name
+        return f"Erro na API de IA: {e}", "Erro/Desconhecido"
 
 def get_ai_tech_advice(errors):
     """
     Envia lista de erros do EPubCheck para a IA e retorna diagnóstico e correção.
     """
-    model_name = "qwen3-vl-8b"
     if not errors:
-        return "", model_name
+        return "", "N/A"
     
     # Filtra apenas erros importantes para não sobrecarregar
     critical_errors = [e for e in errors if e['severity'] in ['FATAL', 'ERROR']]
     if not critical_errors:
-        return "", model_name
+        return "", "N/A"
 
     error_summary = ""
     for idx, e in enumerate(critical_errors, 1):
@@ -174,11 +172,12 @@ def get_ai_tech_advice(errors):
     prompt = prompt_template.format(error_summary=error_summary)
 
     try:
+        print(f"{Fore.BLUE}    [IA] Enviando logs para conselhos técnicos...")
         response = client.chat.completions.create(
-            model=model_name,
+            model="qwen3-vl-8b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3
         )
-        return response.choices[0].message.content, model_name
+        return response.choices[0].message.content, response.model
     except Exception as ex:
-        return f"<p style='color:red'>Erro ao consultar IA para conselhos técnicos: {str(ex)}</p>", model_name
+        return f"<p style='color:red'>Erro ao consultar IA para conselhos técnicos: {str(ex)}</p>", "Erro/Desconhecido"
