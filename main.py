@@ -175,11 +175,6 @@ def generate_html_report(epub_name, data):
             <p style="margin-top: 10px; font-size: 0.9em; color: #7f8c8d;">
                 <strong>Créditos:</strong> {data.get('typesetter', 'Não identificado')}
             </p>
-            {f'''
-            <p style="margin-top: 5px; font-size: 0.85em; color: #95a5a6;">
-                <strong>Uso de Tokens (Total):</strong> {data.get('total_tokens', 0)} (Prompt: {data.get('total_prompt_tokens', 0)}, Resposta: {data.get('total_completion_tokens', 0)})
-            </p>
-            ''' if data.get('total_tokens') else ""}
         </div>
 
         <div class="card">
@@ -196,11 +191,6 @@ def generate_html_report(epub_name, data):
             <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 5px solid #3498db; font-size: 0.95em; line-height: 1.6;">
                 {data.get('ai_advice', 'Nenhum erro crítico para análise.')}
             </div>
-            {f'''
-            <div style="margin-top: 10px; font-size: 0.8em; color: #7f8c8d; text-align: right;">
-                Tokens: {data.get('advice_tokens', 0)}
-            </div>
-            ''' if data.get('advice_tokens') else ""}
         </div>
         ''' if data.get('ai_advice') else ""}
 
@@ -219,7 +209,6 @@ def generate_html_report(epub_name, data):
             <div style="margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px;">
                 <h3>📍 {item.get('location', 'N/A')} <span class="badge" style="background:#8e44ad">{item.get('type', 'Geral')}</span> <small style="color: #7f8c8d; font-size: 0.8em; font-weight: normal;">(IA: {item.get('ai_model', 'N/A')})</small></h3>
                 <p><strong>Parecer da IA:</strong> {item.get('analysis', 'Sem análise')}</p>
-                {f'<p style="font-size: 0.8em; color: #7f8c8d;">Tokens: {item.get("tokens", 0)}</p>' if item.get('tokens') else ""}
                 {f'<img src="{item["image_url"]}" class="screenshot-thumb" onclick="openModal(this.src)">' if item.get('image_url') else '<p><em>Sem captura de tela.</em></p>'}
             </div>
             """ for item in data.get('vision_results', [])])}
@@ -373,6 +362,7 @@ def process_single_epub(epub_path):
     
     # Adicional: Conselhos da IA para erros técnicos
     print(f"{Fore.BLUE}[IA] Consultando IA para conselhos técnicos sobre o EPubCheck...")
+    print(f"{Fore.WHITE}    [DEBUG] Enviando {len(report_data['epubcheck']['messages'])} mensagens para análise.")
     s_ia = time.time()
     ia_res = get_ai_tech_advice(report_data['epubcheck']['messages'])
     raw_advice = ia_res.get("content", "")

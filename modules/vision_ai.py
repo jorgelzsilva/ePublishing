@@ -153,6 +153,8 @@ def analyze_image_with_ai(img_path, prompt):
         
         if not content:
             print(f"{Fore.RED}    [DEBUG] Resposta da IA vazia para análise visual.")
+        else:
+            print(f"{Fore.GREEN}    [OK] Análise visual concluída. Uso: {usage['prompt_tokens']} prompt, {usage['completion_tokens']} resposta.")
             
         return {
             "content": content,
@@ -191,14 +193,16 @@ def get_ai_tech_advice(errors):
     prompt_template = load_prompt("AI_TECH_ADVICE")
     prompt = prompt_template.format(error_summary=error_summary)
 
+    print(f"{Fore.CYAN}    [DEBUG] Erros enviados para IA:\n{error_summary}")
+
     try:
         print(f"{Fore.BLUE}    [IA] Enviando logs para conselhos técnicos...")
-        # DEBUG: print(f"--- PROMPT ENVIADO ---\n{prompt}\n---------------------")
         
         response = client.chat.completions.create(
             model="qwen3-vl-8b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3
+        )
         )
         
         content = response.choices[0].message.content
@@ -212,6 +216,8 @@ def get_ai_tech_advice(errors):
             print(f"{Fore.RED}    [DEBUG] Resposta da IA vazia para conselhos técnicos.")
             # Se a resposta vier vazia mas houver erros, algo no modelo local falhou ou o prompt barrou tudo.
             content = "A IA não retornou sugestões para os erros fornecidos. Verifique se o modelo está carregado corretamente ou se os logs contêm caracteres que impedem a análise."
+        else:
+            print(f"{Fore.GREEN}    [OK] Conselhos técnicos recebidos. Uso: {usage['prompt_tokens']} prompt, {usage['completion_tokens']} resposta.")
 
         return {
             "content": content,
