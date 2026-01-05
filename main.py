@@ -185,14 +185,12 @@ def generate_html_report(epub_name, data):
             </table>
         </div>
 
-        {f'''
         <div class="card">
             <h2>2. Sugestões de Correção da IA <small style="color: #7f8c8d; font-size: 0.6em; font-weight: normal;">(Modelo: {data.get('ai_advice_model', 'N/A')})</small></h2>
             <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 5px solid #3498db; font-size: 0.95em; line-height: 1.6;">
-                {data.get('ai_advice', 'Nenhum erro crítico para análise.')}
+                {data.get('ai_advice') if data.get('ai_advice') else '✅ Nenhum erro crítico detectado para análise da IA.'}
             </div>
         </div>
-        ''' if data.get('ai_advice') else ""}
 
         <div class="card">
             <h2>3. Atividades Interativas (Exercícios e Gabarito)</h2>
@@ -202,18 +200,20 @@ def generate_html_report(epub_name, data):
             {f"<div style='margin-top:15px; padding:10px; background:#fdf2f2; border-left:4px solid #e74c3c; color:#c0392b;'><strong>Falhas detectadas:</strong> {len(data['interactivity_issues'])} itens inconsistentes.</div>" if data.get('interactivity_issues') else ""}
         </div>
 
-        {f'''
         <div class="card">
             <h2>4. Análise Visual (IA Qwen3 VL)</h2>
-            {''.join([f"""
-            <div style="margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px;">
-                <h3>📍 {item.get('location', 'N/A')} <span class="badge" style="background:#8e44ad">{item.get('type', 'Geral')}</span> <small style="color: #7f8c8d; font-size: 0.8em; font-weight: normal;">(IA: {item.get('ai_model', 'N/A')})</small></h3>
-                <p><strong>Parecer da IA:</strong> {item.get('analysis', 'Sem análise')}</p>
-                {f'<img src="{item["image_url"]}" class="screenshot-thumb" onclick="openModal(this.src)">' if item.get('image_url') else '<p><em>Sem captura de tela.</em></p>'}
-            </div>
-            """ for item in data.get('vision_results', [])])}
+            {
+                ''.join([f"""
+                <div style="margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px;">
+                    <h3>📍 {item.get('location', 'N/A')} <span class="badge" style="background:#8e44ad">{item.get('type', 'Geral')}</span> <small style="color: #7f8c8d; font-size: 0.8em; font-weight: normal;">(IA: {item.get('ai_model', 'N/A')})</small></h3>
+                    <p><strong>Parecer da IA:</strong> {item.get('analysis', 'Sem análise')}</p>
+                    {f'<img src="{item["image_url"]}" class="screenshot-thumb" onclick="openModal(this.src)">' if item.get('image_url') else '<p><em>Sem captura de tela.</em></p>'}
+                </div>
+                """ for item in data.get('vision_results', [])])
+                if ENABLE_VISION_AI and data.get('vision_results') else
+                '<p style="color: #7f8c8d;"><em>Análise visual desativada nas configurações ou nenhum item complexo detectado para amostragem.</em></p>'
+            }
         </div>
-        ''' if ENABLE_VISION_AI else ""}
 
         <div class="card">
             <h2>5. CSS e Estrutura</h2>

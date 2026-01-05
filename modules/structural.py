@@ -12,36 +12,102 @@ def check_toc_and_pagelist(epub_path):
             nav_file = next((f for f in z.namelist() if 'nav.xhtml' in f.lower()), None)
             ncx_file = next((f for f in z.namelist() if 'toc.ncx' in f.lower()), None)
             
-            # Procura também o sumário visual (sumario.xhtml, toc.xhtml, contents.xhtml)
-            visual_toc_file = next((f for f in z.namelist() if any(name in f.lower() for name in ['sumario.xhtml', 'toc.xhtml', 'contents.xhtml', 'sumário.xhtml'])), None)
+            # Se não achou nav.xhtml, tenta encontrar qualquer arquivo que pareça ser um Nav EPUB 3
+            if not nav_file:
+                for f_name in z.namelist():
+                    if f_name.lower().endswith(('.xhtml', '.html')):
+                        with z.open(f_name) as f:
+                            head = f.read(1024).decode('utf-8', errors='ignore').lower()
+                            if '<nav' in head:
+                                nav_file = f_name
+                                break
+
+            # Procura também o sumário visual (priorizando sumario.xhtml)
+            names_to_check = ['sumario.xhtml', 'sumário.xhtml']
+            visual_toc_file = next((f for f in z.namelist() if any(name in f.lower() for name in names_to_check)), None)
             
+            # Se não achou sumário, tenta outros nomes comuns
+            if not visual_toc_file:
+                visual_toc_file = next((f for f in z.namelist() if any(name in f.lower() for name in ['toc.xhtml', 'contents.xhtml'])), None)
+
             links_to_check = []
-            pages_count = 0
+            pages_data = [] # Lista de dicionários {"label": str, "href": str, "source": str}
             toc_type = ""
 
             # Prioriza Nav (EPUB 3)
             if nav_file:
                 with z.open(nav_file) as f:
-                    tree = etree.parse(f)
-                    links_to_check = tree.xpath('//*[local-name()="nav" and contains(@*[local-name()="type"], "toc")]//*[local-name()="a"]')
-                    pages = tree.xpath('//*[local-name()="nav" and contains(@*[local-name()="type"], "page-list")]//*[local-name()="li"]')
-                    pages_count = len(pages)
-                    toc_type = "Nav (EPUB 3)"
-                    logs.append(f"📚 <strong>Sumário Técnico:</strong> {toc_type}")
-                    logs.append(f"   └─ Arquivo: <code>{nav_file}</code>")
-                    print(f"    [OK] Sumário Nav detectado.")
+                    try:
+                        tree = etree.parse(f)
+                        links_to_check = tree.xpath('//*[local-name()="nav" and (contains(@*[local-name()="type"], "toc") or contains(@role, "toc"))]//*[local-name()="a"]')
+                        pages_nodes = tree.xpath('//*[local-name()="nav" and (contains(@*[local-name()="type"], "page-list") or contains(@role, "pagelist"))]//*[local-name()="a"]')
+                        for p in pages_nodes:
+                            pages_data.append({
+                                "label": "".join(p.xpath('.//text()')).strip(),
+                                "href": p.get('href', ''),
+                                "source": nav_file
+                            })
+                        toc_type = "Nav (EPUB 3)"
+                        if links_to_check:
+                            logs.append(f"📚 <strong>Sumário Técnico:</strong> {toc_type}")
+                            logs.append(f"   └─ Arquivo: <code>{nav_file}</code>")
+                            print(f"    [OK] Sumário Nav detectado.")
+                    except:
+                        pass
 
             # Se não achou links no Nav, tenta NCX (EPUB 2)
             if not links_to_check and ncx_file:
                 with z.open(ncx_file) as f:
                     tree = etree.parse(f)
                     links_to_check = tree.xpath('//*[local-name()="navPoint"]')
-                    pages = tree.xpath('//*[local-name()="pageTarget"]')
-                    pages_count = len(pages)
+                    if not pages_data:
+                        pages_nodes = tree.xpath('//*[local-name()="pageTarget"]')
+                        for p in pages_nodes:
+                            label = "".join(p.xpath('.//*[local-name()="navLabel"]//*[local-name()="text"]/text()')).strip()
+                            href = p.xpath('.//*[local-name()="content"]/@src')
+                            pages_data.append({
+                                "label": label,
+                                "href": href[0] if href else "",
+                                "source": ncx_file
+                            })
                     toc_type = "NCX (EPUB 2)"
                     logs.append(f"📚 <strong>Sumário Técnico:</strong> {toc_type}")
                     logs.append(f"   └─ Arquivo: <code>{ncx_file}</code>")
                     print(f"    [OK] Sumário NCX detectado.")
+            
+            # Se não achou PageList no Nav ou NCX, tenta no Sumário Visual (EPUB 3 structure)
+            if not pages_data and visual_toc_file:
+                with z.open(visual_toc_file) as f:
+                    tree = etree.HTML(f.read())
+                    pages_nodes = tree.xpath('//*[(@*[contains(local-name(), "type") and .="page-list"] or contains(@role, "pagelist"))]//*[local-name()="a"]')
+                    for p in pages_nodes:
+                        pages_data.append({
+                            "label": "".join(p.xpath('.//text()')).strip(),
+                            "href": p.get('href', ''),
+                            "source": visual_toc_file
+                        })
+
+            # Fallback Brute-force: Escaneia todos os arquivos em busca de marcadores de página individuais
+            if not pages_data:
+                for f_name in z.namelist():
+                    if f_name.lower().endswith(('.xhtml', '.html')):
+                        with z.open(f_name) as f:
+                            content = f.read().decode('utf-8', errors='ignore')
+                            # Busca por marcadores e seus atributos
+                            # Regex para pegar o marcador e tentar extrair id e label/text
+                            marker_matches = re.finditer(r'<[^>]+(?:epub:type|role)=["\'](?:doc-)?pagebreak["\'][^>]*>', content, re.IGNORECASE)
+                            for match in marker_matches:
+                                tag_full = match.group(0)
+                                pid = re.search(r'id=["\']([^"\']+)["\']', tag_full, re.IGNORECASE)
+                                label = re.search(r'aria-label=["\']([^"\']+)["\']', tag_full, re.IGNORECASE) or re.search(r'title=["\']([^"\']+)["\']', tag_full, re.IGNORECASE)
+                                
+                                pages_data.append({
+                                    "label": label.group(1) if label else (pid.group(1) if pid else "?"),
+                                    "href": f"{f_name}#{pid.group(1)}" if pid else f_name,
+                                    "source": "Scan Bruto"
+                                })
+                if pages_data:
+                    logs.append(f"📄 <strong>PageList detectada via Scan de Marcadores:</strong> {len(pages_data)} encontrados.")
 
             # Validação real dos links com detalhamento
             broken = 0
@@ -173,15 +239,15 @@ def check_toc_and_pagelist(epub_path):
                                                 found = norm_extreme(text_inside_a) in norm_extreme(target_text_all)
 
                                         if found:
-                                            content_status = " <small style='color:#27ae60'>(Conteúdo verificado)</small>"
+                                            content_status = "<small style='color:#27ae60'>(Conteúdo verificado)</small> "
                                         else:
-                                            content_status = " <small style='color:#e74c3c'>(⚠️ Texto não encontrado no conteúdo!)</small>"
+                                            content_status = "<small style='color:#e74c3c'>(⚠️ Texto não encontrado no conteúdo!)</small> "
                                             label_content_errors.append({
                                                 "label": text_inside_a,
                                                 "file": clean_href
                                             })
                                     else:
-                                        content_status = " <small style='color:#bdc3c7'>(Texto curto, conteúdo ignorado)</small>"
+                                        content_status = "<small style='color:#bdc3c7'>(Texto curto, conteúdo ignorado)</small> "
 
                                     # 2. Verifica se a âncora existe no arquivo de destino
                                     if anchor:
@@ -219,7 +285,7 @@ def check_toc_and_pagelist(epub_path):
                     
                     # Mostra todos os links do sumário visual com status de verificação
                     for vl in visual_valid:
-                        logs.append(f"      ✓ \"{vl['label']}\" → <code>{vl['target']}</code>{vl['status']}")
+                        logs.append(f"      {vl['status']}✓ \"{vl['label']}\" → <code>{vl['target']}</code>")
                     
                     # Relatório de duplicados
                     dups = [h for h, c in duplicate_links.items() if c > 1]
@@ -260,15 +326,14 @@ def check_toc_and_pagelist(epub_path):
                             logs.append(f"   └─ <code>#{ae['anchor']}</code> não existe em <code>{ae['file']}</code>")
                         print(f"{Fore.RED}    [X] {len(anchor_errors)} âncoras não encontradas nos arquivos destino")
             
-            # PageList
-            if pages_count > 0:
-                msg = f"✅ PageList detectada e validada ({pages_count} páginas)."
-                logs.append(f"")
-                logs.append(f"📄 <strong>PageList:</strong> {pages_count} páginas mapeadas")
-                print(f"{Fore.GREEN}    [OK] {msg}")
+            # Validação Modular da PageList
+            if pages_data:
+                pl_ok, pl_logs = validate_pagelist_integrity(z, pages_data)
+                logs.extend(pl_logs)
             else:
-                logs.append(f"")
+                logs.append("")
                 logs.append("ℹ️ Nenhuma PageList encontrada (opcional para EPUB 3).")
+                print(f"{Fore.YELLOW}    [!] Nenhuma PageList encontrada.")
 
             return True, logs
     except Exception as e:
@@ -276,6 +341,91 @@ def check_toc_and_pagelist(epub_path):
         logs.append(msg)
         print(f"{Fore.RED}    [!] {msg}")
         return False, logs
+
+def validate_pagelist_integrity(z, pages_data):
+    """
+    Função dedicada para validar a integridade da lista de páginas.
+    Verifica sequência numérica e existência de IDs.
+    """
+    logs = []
+    if not pages_data:
+        return True, []
+
+    logs.append(f"📄 <strong>Validando PageList:</strong> {len(pages_data)} itens detectados.")
+    
+    # 1. Validação de Sequência Numérica
+    sequence_errors = []
+    last_val = 0
+    duplicate_pages = {}
+    
+    for i, p in enumerate(pages_data):
+        label = p.get('label', '')
+        # Extrai o primeiro número encontrado no label
+        nums = re.findall(r'\d+', label)
+        if nums:
+            current_val = int(nums[0])
+            if last_val != 0 and current_val != last_val + 1:
+                # Se for o mesmo número, é duplicado
+                if current_val == last_val:
+                    duplicate_pages[current_val] = duplicate_pages.get(current_val, 0) + 1
+                else:
+                    sequence_errors.append(f"Salto: {last_val} → {current_val} (Item {i+1})")
+            last_val = current_val
+
+    if sequence_errors:
+        logs.append(f"   └─ <span style='color:#f39c12'>⚠️ Sequência numérica com saltos:</span> {', '.join(sequence_errors[:3])}...")
+    if duplicate_pages:
+        dup_list = [str(k) for k in duplicate_pages.keys()]
+        logs.append(f"   └─ <span style='color:#e74c3c'>❌ Páginas repetidas detectadas:</span> {', '.join(dup_list[:5])}")
+
+    # 2. Validação de Existência de IDs (Âncoras)
+    broken_ids = []
+    internal_files = [f.lower() for f in z.namelist()]
+    
+    # Cache de arquivos já verificados para performance
+    content_cache = {}
+
+    for p in pages_data:
+        href = p.get('href', '')
+        if not href: continue
+        
+        target_file = href.split('#')[0]
+        anchor = href.split('#')[1] if '#' in href else None
+        
+        # Resolve caminho relativo (se o source for em subpasta)
+        source_file = p.get('source', '')
+        if source_file and '/' in source_file and not target_file.startswith(('/', '..')):
+            toc_dir = "/".join(source_file.split('/')[:-1])
+            full_path = f"{toc_dir}/{target_file}".replace('//', '/').lower()
+        else:
+            full_path = target_file.lower()
+
+        # Verifica se o arquivo existe
+        actual_file = next((f for f in z.namelist() if full_path in f.lower()), None)
+        if not actual_file:
+            broken_ids.append(f"Arquivo não localizado: <code>{target_file}</code>")
+            continue
+
+        # Verifica ID se houver
+        if anchor:
+            if actual_file not in content_cache:
+                with z.open(actual_file) as f:
+                    content_cache[actual_file] = f.read().decode('utf-8', errors='ignore')
+            
+            content = content_cache[actual_file]
+            if f'id="{anchor}"' not in content and f"id='{anchor}'" not in content:
+                broken_ids.append(f"ID <code>#{anchor}</code> não encontrado em <code>{actual_file}</code>")
+
+    if broken_ids:
+        logs.append(f"   └─ <span style='color:#e74c3c'>❌ Erros de destino ({len(broken_ids)}):</span>")
+        for error in broken_ids[:5]:
+            logs.append(f"      ⚠️ {error}")
+    else:
+        logs.append(f"   └─ <span style='color:#27ae60'>✅ Todos os destinos (arquivos e IDs) foram validados.</span>")
+
+    # Status final da PageList
+    overall_ok = len(broken_ids) == 0 and not duplicate_pages
+    return overall_ok, logs
 
 # Lógica para validar se o ID do link existe no destino
 def validate_anchor(zip_ref, href):
@@ -286,39 +436,7 @@ def validate_anchor(zip_ref, href):
         content = f.read().decode('utf-8')
         return f'id="{anchor}"' in content or f"id='{anchor}'" in content
 
-def validate_pagelist_sequence(pages_nodes):
-    """Verifica se a sequência de páginas (ex: 1, 2, 3) está correta."""
-    sequence_errors = []
-    last_val = 0
-    
-    for node in pages_nodes:
-        # Extrai apenas os números do texto da página (ex: "Página 10" -> 10)
-        label = "".join(node.xpath('.//text()')).strip()
-        nums = re.findall(r'\d+', label)
-        if nums:
-            current_val = int(nums[0])
-            if current_val != last_val + 1:
-                sequence_errors.append(f"Salto detectado: de {last_val} para {current_val}")
-            last_val = current_val
-    return sequence_errors
 
-def check_internal_integrity(epub_path, links):
-    """Verifica se o ID de destino (#ancora) realmente existe no XHTML."""
-    broken_anchors = []
-    with zipfile.ZipFile(epub_path, 'r') as z:
-        for link in links:
-            href = link.get('href')
-            if href and '#' in href:
-                file_path, anchor = href.split('#')
-                # Tenta abrir o arquivo de destino e buscar o ID
-                try:
-                    with z.open(file_path) as f:
-                        content = f.read().decode('utf-8', errors='ignore')
-                        if f'id="{anchor}"' not in content and f"id='{anchor}'" not in content:
-                            broken_anchors.append(href)
-                except:
-                    continue # Arquivo não encontrado já é pego na validação de arquivo
-    return broken_anchors
 
 def get_typesetting_credit(epub_path):
     """
