@@ -136,7 +136,7 @@ def check_toc_and_pagelist(epub_path):
             if broken > 0:
                 msg = f"❌ {broken} links do sumário estão quebrados ou órfãos."
                 logs.append(f"   └─ <span style='color:#e74c3c'>{msg}</span>")
-                for bl in broken_links[:5]:
+                for bl in broken_links:
                     logs.append(f"      ⚠️ \"{bl['label']}\" → <code>{bl['target']}</code> (NÃO ENCONTRADO)")
                 print(f"{Fore.RED}    [X] {msg}")
             else:
@@ -292,14 +292,14 @@ def check_toc_and_pagelist(epub_path):
                     if dups:
                         logs.append(f"")
                         logs.append(f"🔄 <strong>Links Duplicados:</strong> {len(dups)} detectados")
-                        for d in dups[:5]:
+                        for d in dups:
                             logs.append(f"   └─ <code>{d}</code> aparece {duplicate_links[d]} vezes")
 
                     # Inconsistência de Conteúdo (Texto do link não achado no destino)
                     if label_content_errors:
                         logs.append(f"")
                         logs.append(f"❓ <strong>Inconsistência de Conteúdo:</strong>")
-                        for lce in label_content_errors[:10]:
+                        for lce in label_content_errors:
                             logs.append(f"   └─ Texto <code>\"{lce['label']}\"</code> não encontrado em <code>{lce['file']}</code>")
                         print(f"{Fore.YELLOW}    [!] {len(label_content_errors)} títulos não encontrados no conteúdo de destino")
 
@@ -314,7 +314,7 @@ def check_toc_and_pagelist(epub_path):
                     if title_warnings:
                         logs.append(f"")
                         logs.append(f"⚠️ <strong>Títulos parcialmente fora do &lt;a&gt;:</strong>")
-                        for tw in title_warnings[:10]:
+                        for tw in title_warnings:
                             logs.append(f"   └─ \"{tw['title']}...\" tem texto fora: <code>{tw['outside']}</code>")
                         print(f"{Fore.YELLOW}    [!] {len(title_warnings)} títulos com texto fora do link")
                     
@@ -322,7 +322,7 @@ def check_toc_and_pagelist(epub_path):
                     if anchor_errors:
                         logs.append(f"")
                         logs.append(f"❌ <strong>Âncoras não encontradas:</strong>")
-                        for ae in anchor_errors[:10]:
+                        for ae in anchor_errors:
                             logs.append(f"   └─ <code>#{ae['anchor']}</code> não existe em <code>{ae['file']}</code>")
                         print(f"{Fore.RED}    [X] {len(anchor_errors)} âncoras não encontradas nos arquivos destino")
             
@@ -373,10 +373,10 @@ def validate_pagelist_integrity(z, pages_data):
             last_val = current_val
 
     if sequence_errors:
-        logs.append(f"   └─ <span style='color:#f39c12'>⚠️ Sequência numérica com saltos:</span> {', '.join(sequence_errors[:3])}...")
+        logs.append(f"   └─ <span style='color:#f39c12'>⚠️ Sequência numérica com saltos:</span> {', '.join(sequence_errors)}")
     if duplicate_pages:
         dup_list = [str(k) for k in duplicate_pages.keys()]
-        logs.append(f"   └─ <span style='color:#e74c3c'>❌ Páginas repetidas detectadas:</span> {', '.join(dup_list[:5])}")
+        logs.append(f"   └─ <span style='color:#e74c3c'>❌ Páginas repetidas detectadas:</span> {', '.join(dup_list)}")
 
     # 2. Validação de Existência de IDs (Âncoras)
     broken_ids = []
@@ -418,7 +418,7 @@ def validate_pagelist_integrity(z, pages_data):
 
     if broken_ids:
         logs.append(f"   └─ <span style='color:#e74c3c'>❌ Erros de destino ({len(broken_ids)}):</span>")
-        for error in broken_ids[:5]:
+        for error in broken_ids:
             logs.append(f"      ⚠️ {error}")
     else:
         logs.append(f"   └─ <span style='color:#27ae60'>✅ Todos os destinos (arquivos e IDs) foram validados.</span>")
