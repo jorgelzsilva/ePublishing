@@ -467,22 +467,46 @@ def generate_html_report(epub_name, data):
 
             <section class="card" style="margin-bottom: 100px;">
                 <h2>09. Performance</h2>
-                <div class="stats-grid">
-                    <div class="stat-box">
-                        <span class="stat-value">{data['timings'].get('total', 0):.2f}s</span>
-                        <span class="stat-label">Tempo Total</span>
+                <div style="display: flex; flex-direction: column; gap: 12px; max-width: 500px;">
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                        <span>1. EPubCheck:</span>
+                        <span style="font-weight:600;">{data['timings'].get('epubcheck', 0):.2f}s</span>
                     </div>
-                    <div class="stat-box">
-                        <span class="stat-value">{data['timings'].get('epubcheck', 0):.2f}s</span>
-                        <span class="stat-label">EPubCheck</span>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                        <span>2. Estrutura (TOC/NCX):</span>
+                        <span style="font-weight:600;">{data['timings'].get('structure', 0):.2f}s</span>
                     </div>
-                    <div class="stat-box">
-                        <span class="stat-value">{data['timings'].get('xhtml_analysis', 0):.2f}s</span>
-                        <span class="stat-label">Análise XHTML</span>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                        <span>3. Análise de CSS:</span>
+                        <span style="font-weight:600;">{data['timings'].get('css_analysis', 0):.2f}s</span>
                     </div>
-                    <div class="stat-box">
-                        <span class="stat-value" style="color:var(--accent)">{data.get('total_tokens', 0)}</span>
-                        <span class="stat-label">Tokens AI</span>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                        <span>4. Análise XHTML:</span>
+                        <span style="font-weight:600;">{data['timings'].get('xhtml_analysis', 0):.2f}s</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                        <span>5. Links Externos:</span>
+                        <span style="font-weight:600;">{data['timings'].get('external_links', 0):.2f}s</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                        <span>6. Visão IA:</span>
+                        <span style="font-weight:600;">{data['timings'].get('vision_ai', 0):.2f}s</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                        <span>IA (Conselhos):</span>
+                        <span style="font-weight:600;">{data['timings'].get('ai_advice', 0):.2f}s</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                        <span>7. Interatividade:</span>
+                        <span style="font-weight:600;">{data['timings'].get('interactivity', 0):.2f}s</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                        <span>Tokens AI:</span>
+                        <span style="font-weight:600; color:var(--accent)">{data.get('total_tokens', 0)}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-top: 2px solid var(--text); padding-top: 15px; margin-top: 5px;">
+                        <span style="font-weight:700; text-transform: uppercase; letter-spacing: 0.05em;">Tempo Total:</span>
+                        <span style="font-weight:700; color: #27ae60; font-size: 1.2rem;">{data['timings'].get('total', 0):.2f}s</span>
                     </div>
                 </div>
             </section>
