@@ -107,9 +107,9 @@ def generate_html_report(epub_name, data):
     
     error_rows = ""
     for m in eb['messages']:
-        color = "#e74c3c" if m['severity'] in ['FATAL', 'ERROR'] else "#f39c12" if m['severity'] == 'WARNING' else "#3498db"
-        snippet_html = f"<div style='background:#f9f9f9; border-left:4px solid {color}; padding:8px; margin-top:5px; font-family:monospace; font-size:0.85em; color:#333; overflow-x:auto;'><code>{m.get('snippet', '')}</code></div>" if m.get('snippet') else ""
-        error_rows += f"<tr><td style='color:{color}; font-weight:bold;'>{m['severity']}</td><td>{m['location']}</td><td>{m['text']}{snippet_html}</td></tr>"
+        color = "var(--error)" if m['severity'] in ['FATAL', 'ERROR'] else "var(--warning)" if m['severity'] == 'WARNING' else "var(--info)"
+        snippet_html = f"<div class='snippet'><code>{m.get('snippet', '')}</code></div>" if m.get('snippet') else ""
+        error_rows += f"<tr><td><span class='badge' style='background:{color}'>{m['severity']}</span></td><td>{m['location']}</td><td>{m['text']}{snippet_html}</td></tr>"
 
     # Sort external links: errors (non-200) first, then alphabetical by URL
     sorted_links = sorted(data.get('external_links', []), key=lambda x: (x['status'] == 200, x['url']))
@@ -125,24 +125,220 @@ def generate_html_report(epub_name, data):
     missing_html = "".join([f"<li>{item}</li>" for item in missing_divs]) if missing_divs else "<li>✅ Todos os ficheiros estão OK.</li>"
 
     html = f"""
-    <html>
+    <!DOCTYPE html>
+    <html lang="pt-br">
     <head>
-        <title>Relatório {epub_name}</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Relatório de Validação | {epub_name}</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
         <style>
-            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background: #f4f7f6; color: #333; }}
-            .card {{ background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }}
-            h1, h2 {{ color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }}
-            table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
-            th {{ background: #f8f9fa; text-align: left; padding: 12px; border-bottom: 2px solid #dee2e6; }}
-            td {{ padding: 10px; border-bottom: 1px solid #eee; font-size: 0.9em; }}
-            .screenshot-thumb {{ width: 300px; cursor: zoom-in; border: 4px solid #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: transform 0.2s; }}
-            .screenshot-thumb:hover {{ transform: scale(1.02); }}
-            .badge {{ padding: 6px 12px; border-radius: 20px; color: white; font-weight: bold; margin-right: 10px; }}
+            :root {{
+                --bg: #fdfdfc;
+                --surface: #ffffff;
+                --text: #1a1a1b;
+                --text-muted: #626264;
+                --accent: #1b4332;
+                --border: #e8e8e6;
+                --error: #c0392b;
+                --warning: #d35400;
+                --info: #2980b9;
+                --shadow: 0 10px 30px -10px rgba(0,0,0,0.05);
+            }}
+
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
             
+            body {{ 
+                font-family: 'Outfit', sans-serif; 
+                background: var(--bg); 
+                color: var(--text); 
+                line-height: 1.6;
+                padding: 40px 20px;
+                -webkit-font-smoothing: antialiased;
+            }}
+
+            .container {{ 
+                max-width: 1100px; 
+                margin: 0 auto; 
+            }}
+
+            header {{
+                margin-bottom: 60px;
+                border-bottom: 4px solid var(--text);
+                padding-bottom: 30px;
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+            }}
+
+            h1 {{ 
+                font-family: 'Bricolage Grotesque', sans-serif;
+                font-size: clamp(2.5rem, 8vw, 4.5rem);
+                line-height: 0.95;
+                letter-spacing: -0.04em;
+                text-transform: uppercase;
+                color: var(--text);
+            }}
+
+            .header-meta {{
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 20px;
+                font-weight: 600;
+            }}
+
+            h2 {{ 
+                font-family: 'Bricolage Grotesque', sans-serif;
+                font-size: 1.8rem;
+                margin-bottom: 25px;
+                letter-spacing: -0.02em;
+                display: flex;
+                align-items: baseline;
+                gap: 10px;
+            }}
+            
+            h2 small {{ font-size: 0.5em; color: var(--text-muted); font-weight: normal; }}
+
+            .card {{ 
+                background: var(--surface); 
+                padding: 40px; 
+                border: 1px solid var(--border);
+                margin-bottom: 40px; 
+                box-shadow: var(--shadow);
+            }}
+
+            .stats-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 20px;
+                margin-top: 20px;
+            }}
+
+            .stat-box {{
+                padding: 20px;
+                border: 1px solid var(--border);
+                text-align: center;
+            }}
+
+            .stat-value {{
+                font-family: 'Bricolage Grotesque', sans-serif;
+                font-size: 2.5rem;
+                display: block;
+                line-height: 1;
+            }}
+
+            .stat-label {{
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                font-weight: 600;
+                color: var(--text-muted);
+            }}
+
+            table {{ 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin-top: 10px; 
+            }}
+
+            th {{ 
+                text-align: left; 
+                padding: 15px 10px; 
+                border-bottom: 2px solid var(--text);
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                color: var(--text-muted);
+            }}
+
+            td {{ 
+                padding: 15px 10px; 
+                border-bottom: 1px solid var(--border); 
+                font-size: 0.95rem;
+                vertical-align: top;
+            }}
+
+            tr:hover td {{ background: #fcfcf9; }}
+
+            .badge {{ 
+                display: inline-block;
+                padding: 4px 12px; 
+                font-size: 0.7rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                border-radius: 2px; 
+                color: white; 
+                font-weight: 700; 
+            }}
+            
+            .snippet {{
+                background: #f8f8f8;
+                border-left: 3px solid var(--text);
+                padding: 12px;
+                margin-top: 10px;
+                font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+                font-size: 0.8rem;
+                color: #444;
+                overflow-x: auto;
+            }}
+
+            .ai-advice-container {{
+                background: #f0f4f2;
+                padding: 30px;
+                border: 1px solid #d1dbd4;
+                font-size: 1.1rem;
+                line-height: 1.6;
+                color: #1b4332;
+            }}
+
+            .screenshot-thumb {{ 
+                width: 100%;
+                max-width: 400px;
+                cursor: zoom-in; 
+                border: 1px solid var(--border);
+                margin-top: 15px;
+                filter: grayscale(0.2);
+                transition: filter 0.3s;
+            }}
+            
+            .screenshot-thumb:hover {{ filter: grayscale(0); }}
+
+            .log-console {{
+                background: #1a1a1b;
+                color: #e0e0e0;
+                padding: 25px;
+                font-family: inherit;
+                font-size: 0.85rem;
+                max-height: 500px;
+                overflow-y: auto;
+                border: 1px solid #333;
+            }}
+
+            .log-line {{
+                padding: 4px 0;
+                border-bottom: 1px solid #2a2a2b;
+            }}
+
+            .footer-info {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 30px;
+                margin-top: 20px;
+            }}
+
             /* Modal Lightbox */
-            .lightbox {{ display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); }}
-            .lightbox-content {{ margin: auto; display: block; max-width: 90%; max-height: 90vh; border-radius: 5px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }}
-            .close {{ position: absolute; top: 20px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer; }}
+            .lightbox {{ display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.95); cursor: zoom-out; }}
+            .lightbox-content {{ margin: auto; display: block; max-width: 90%; max-height: 90vh; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 30px 60px rgba(0,0,0,0.1); border: 1px solid var(--border); }}
+            .close {{ position: absolute; top: 30px; right: 40px; color: var(--text); font-size: 3rem; font-weight: 300; cursor: pointer; }}
+
+            @media (max-width: 768px) {{
+                body {{ padding: 20px 15px; }}
+                h1 {{ font-size: 3rem; }}
+                .card {{ padding: 25px; }}
+            }}
         </style>
         <script>
             function openModal(src) {{
@@ -154,7 +350,6 @@ def generate_html_report(epub_name, data):
             function closeModal() {{
                 document.getElementById("myModal").style.display = "none";
             }}
-            // Close on outside click
             window.onclick = function(event) {{
                 var modal = document.getElementById("myModal");
                 if (event.target == modal) {{
@@ -162,115 +357,141 @@ def generate_html_report(epub_name, data):
                 }}
             }}
         </script>
-
     </head>
     <body>
-        <div class="card">
-            <h1>E-book: {epub_name}</h1>
-            <p>
-                <span class="badge" style="background:#e74c3c">Erros: {eb['FATAL'] + eb['ERROR']}</span>
-                <span class="badge" style="background:#f39c12">Avisos: {eb['WARNING']}</span>
-                <span class="badge" style="background:#3498db">Alertas: {eb['USAGE']}</span>
-            </p>
-            <p style="margin-top: 10px; font-size: 0.9em; color: #7f8c8d;">
-                <strong>Créditos:</strong> {data.get('typesetter', 'Não identificado')}
-            </p>
-        </div>
-
-        <div class="card">
-            <h2>1. Detalhes do ePubCheck</h2>
-            <table>
-                <thead><tr><th>Gravidade</th><th>Arquivo / Local</th><th>Mensagem de Erro</th></tr></thead>
-                <tbody>{error_rows if error_rows else "<tr><td colspan='3'>Nenhum erro encontrado.</td></tr>"}</tbody>
-            </table>
-        </div>
-
-        <div class="card">
-            <h2>2. Sugestões de Correção da IA <small style="color: #7f8c8d; font-size: 0.6em; font-weight: normal;">(Modelo: {data.get('ai_advice_model', 'N/A')})</small></h2>
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 5px solid #3498db; font-size: 0.95em; line-height: 1.6;">
-                {data.get('ai_advice') if data.get('ai_advice') else '✅ Nenhum erro crítico detectado para análise da IA.'}
-            </div>
-        </div>
-
-        <div class="card">
-            <h2>3. Atividades Interativas (Exercícios e Gabarito)</h2>
-            <div style="background: white; padding: 15px; border-radius: 5px; border: 1px solid #eee;">
-                {''.join([f'<div style="margin-bottom: 8px; font-size: 0.9em;">{log}</div>' for log in data.get('interactivity_logs', [])]) if data.get('interactivity_logs') else "<p>Nenhuma atividade interativa detectada ou erro no processamento.</p>"}
-            </div>
-            {f"<div style='margin-top:15px; padding:10px; background:#fdf2f2; border-left:4px solid #e74c3c; color:#c0392b;'><strong>Falhas detectadas:</strong> {len(data['interactivity_issues'])} itens inconsistentes.</div>" if data.get('interactivity_issues') else ""}
-        </div>
-
-        <div class="card">
-            <h2>4. Análise Visual (IA Qwen3 VL)</h2>
-            {
-                ''.join([f"""
-                <div style="margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px;">
-                    <h3>📍 {item.get('location', 'N/A')} <span class="badge" style="background:#8e44ad">{item.get('type', 'Geral')}</span> <small style="color: #7f8c8d; font-size: 0.8em; font-weight: normal;">(IA: {item.get('ai_model', 'N/A')})</small></h3>
-                    <p><strong>Parecer da IA:</strong> {item.get('analysis', 'Sem análise')}</p>
-                    {f'<img src="{item["image_url"]}" class="screenshot-thumb" onclick="openModal(this.src)">' if item.get('image_url') else '<p><em>Sem captura de tela.</em></p>'}
+        <div class="container">
+            <header>
+                <h1>{epub_name}</h1>
+                <div class="header-meta">
+                    <span class="stat-label">Créditos: {data.get('typesetter', 'Não identificado')}</span>
+                    <div class="badge-group">
+                        <span class="badge" style="background:var(--error)">{eb['FATAL'] + eb['ERROR']} Erros</span>
+                        <span class="badge" style="background:var(--warning)">{eb['WARNING']} Avisos</span>
+                        <span class="badge" style="background:var(--info)">{eb['USAGE']} Alertas</span>
+                    </div>
                 </div>
-                """ for item in data.get('vision_results', [])])
-                if ENABLE_VISION_AI and data.get('vision_results') else
-                '<p style="color: #7f8c8d;"><em>Análise visual desativada nas configurações ou nenhum item complexo detectado para amostragem.</em></p>'
-            }
-        </div>
+            </header>
 
-        <div class="card">
-            <h2>5. CSS e Estrutura</h2>
-            <p>Classe .limitador (40em): {"✅ OK" if data['css_rules']['limitador_ok'] else "❌ NÃO ENCONTRADA"}</p>
-            <p>Estrutura Geral: {"✅ OK" if data['structure_ok'] else "❌ AVISOS"}</p>
-        </div>
+            <section class="card">
+                <h2>01. Relatório EPubCheck</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Localização</th>
+                            <th>Mensagem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {error_rows if error_rows else "<tr><td colspan='3'>Nenhum erro encontrado.</td></tr>"}
+                    </tbody>
+                </table>
+            </section>
 
+            <section class="card">
+                <h2>02. IA Technical Advice <small>(Modelo: {data.get('ai_advice_model', 'N/A')})</small></h2>
+                <div class="ai-advice-container">
+                    {data.get('ai_advice') if data.get('ai_advice') else '✅ Nenhum erro crítico detectado para análise da IA.'}
+                </div>
+            </section>
 
-        <div class="card">
-            <h2>6. Ficheiros sem a div .limitador</h2>
-            <ul style="color: {'red' if missing_divs else 'green'}">
-                {missing_html}
-            </ul>
-        </div>
-        
-        <div class="card">
-            <h2>7. Verificação de Links Externos</h2>
-            <table>
-                <thead><tr><th>URL</th><th>Status</th></tr></thead>
-                <tbody>{ext_links_rows if ext_links_rows else "<tr><td colspan='2'>Nenhum link externo encontrado.</td></tr>"}</tbody>
-            </table>
-            
-            <div style="margin-top:20px; text-align:right;">
-                <p><em>Links 200 (OK): {sum(1 for l in data.get('external_links', []) if l['status'] == 200)}</em></p>
+            <section class="card">
+                <h2>03. Atividades Interativas</h2>
+                <div style="border-left: 2px solid var(--accent); padding-left: 20px;">
+                    {''.join([f'<div style="margin-bottom: 12px; font-size: 0.95rem;">{log}</div>' for log in data.get('interactivity_logs', [])]) if data.get('interactivity_logs') else "<p>Nenhuma atividade detectada.</p>"}
+                </div>
+                {f"<div style='margin-top:25px; padding:15px; background:#fff5f5; border:1px solid #feb2b2; color:#c53030; font-weight:600;'>⚠ Falhas detectadas: {len(data['interactivity_issues'])} itens inconsistentes.</div>" if data.get('interactivity_issues') else ""}
+            </section>
+
+            <section class="card">
+                <h2>04. Análise Visual <small>(IA Qwen3 VL)</small></h2>
+                {
+                    ''.join([f"""
+                    <div style="margin-bottom: 40px; padding-bottom: 30px; border-bottom: 1px solid var(--border);">
+                        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:15px;">
+                            <h3 style="font-family:'Bricolage Grotesque';">{item.get('location', 'N/A')}</h3>
+                            <span class="badge" style="background:var(--text)">{item.get('type', 'Geral')}</span>
+                        </div>
+                        <p style="color:var(--text-muted); margin-bottom:20px;">{item.get('analysis', 'Sem análise')}</p>
+                        {f'<img src="{item["image_url"]}" class="screenshot-thumb" onclick="openModal(this.src)">' if item.get('image_url') else '<p><em>Sem captura de tela.</em></p>'}
+                    </div>
+                    """ for item in data.get('vision_results', [])])
+                    if ENABLE_VISION_AI and data.get('vision_results') else
+                    '<p style="color: var(--text-muted);"><em>Análise visual desativada ou não capturada.</em></p>'
+                }
+            </section>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+                <section class="card">
+                    <h2>05. CSS & Estrutura</h2>
+                    <ul style="list-style: none; display: flex; flex-direction: column; gap: 15px;">
+                        <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                            <span>Classe .limitador (40em)</span>
+                            <span style="font-weight:700; color:{'#27ae60' if data['css_rules']['limitador_ok'] else '#c0392b'}">
+                                {"✅ OK" if data['css_rules']['limitador_ok'] else "❌ AUSENTE"}
+                            </span>
+                        </li>
+                        <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                            <span>Estrutura E-book</span>
+                            <span style="font-weight:700; color:{'#27ae60' if data['structure_ok'] else '#e67e22'}">
+                                {"✅ ÍNTEGRA" if data['structure_ok'] else "⚠ AVISOS"}
+                            </span>
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="card">
+                    <h2>06. Limitadores Ausentes</h2>
+                    <div style="max-height: 200px; overflow-y: auto; font-size: 0.85rem;">
+                        <ul style="list-style: none; color: {'var(--error)' if missing_divs else '#27ae60'}">
+                            {missing_html}
+                        </ul>
+                    </div>
+                </section>
             </div>
+
+            <section class="card">
+                <h2>07. Verificação de Links</h2>
+                <table>
+                    <thead><tr><th>URL</th><th>Status</th></tr></thead>
+                    <tbody>{ext_links_rows if ext_links_rows else "<tr><td colspan='2'>Nenhum link externo encontrado.</td></tr>"}</tbody>
+                </table>
+            </section>
+
+            <section class="card">
+                <h2>08. Terminal Logs</h2>
+                <div class="log-console">
+                    {''.join([f'<div class="log-line">{log}</div>' for log in data.get('structure_logs', [])])}
+                </div>
+            </section>
+
+            <section class="card" style="margin-bottom: 100px;">
+                <h2>09. Performance</h2>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <span class="stat-value">{data['timings'].get('total', 0):.2f}s</span>
+                        <span class="stat-label">Tempo Total</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-value">{data['timings'].get('epubcheck', 0):.2f}s</span>
+                        <span class="stat-label">EPubCheck</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-value">{data['timings'].get('xhtml_analysis', 0):.2f}s</span>
+                        <span class="stat-label">Análise XHTML</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-value" style="color:var(--accent)">{data.get('total_tokens', 0)}</span>
+                        <span class="stat-label">Tokens AI</span>
+                    </div>
+                </div>
+            </section>
         </div>
 
-        <div class="card">
-            <h2>8. Logs Detalhados de Validação</h2>
-            <div style="background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 5px; font-family: monospace; max-height: 400px; overflow-y: auto;">
-                {''.join([f'<div style="margin-bottom: 5px; border-bottom: 1px solid #34495e; padding-bottom: 2px;">{log}</div>' for log in data.get('structure_logs', [])])}
-            </div>
+        <div id="myModal" class="lightbox">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <img class="lightbox-content" id="img01">
         </div>
-
-        <div class="card">
-            <h2>9. Tempos de Processamento</h2>
-            <table style="width: auto; min-width: 300px;">
-                <tr><td><strong>1. EPubCheck:</strong></td><td>{data['timings'].get('epubcheck', 0):.2f}s</td></tr>
-                <tr><td><strong>2. Estrutura (TOC/NCX):</strong></td><td>{data['timings'].get('structure', 0):.2f}s</td></tr>
-                <tr><td><strong>3. Análise de CSS:</strong></td><td>{data['timings'].get('css_analysis', 0):.2f}s</td></tr>
-                <tr><td><strong>4. Análise XHTML:</strong></td><td>{data['timings'].get('xhtml_analysis', 0):.2f}s</td></tr>
-                <tr><td><strong>5. Links Externos:</strong></td><td>{data['timings'].get('external_links', 0):.2f}s</td></tr>
-                <tr><td><strong>6. Visão IA:</strong></td><td>{data['timings'].get('vision_ai', 0):.2f}s</td></tr>
-                <tr><td><strong>IA (Conselhos):</strong></td><td>{data['timings'].get('ai_advice', 0):.2f}s</td></tr>
-                <tr><td><strong>7. Interatividade:</strong></td><td>{data['timings'].get('interactivity', 0):.2f}s</td></tr>
-                <tr style="border-top: 2px solid #eee; font-size: 1.1em;">
-                    <td><strong>TEMPO TOTAL:</strong></td>
-                    <td style="color: #27ae60; font-weight: bold;">{data['timings'].get('total', 0):.2f}s</td>
-                </tr>
-            </table>
-        </div>
-    
-    <div id="myModal" class="lightbox">
-        <span class="close" onclick="closeModal()">&times;</span>
-        <img class="lightbox-content" id="img01">
-    </div>
-
     </body>
     </html>
     """
