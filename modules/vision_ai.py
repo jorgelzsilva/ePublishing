@@ -7,7 +7,7 @@ from openai import OpenAI
 from playwright.sync_api import sync_playwright
 from colorama import Fore
 
-client = OpenAI(base_url="http://localhost:1234/v1", api_key="lm-studio")
+client = OpenAI(base_url="http://192.168.28.70:1234/v1", api_key="lm-studio")
 
 def load_prompt(key):
     """Carrega um prompt específico do arquivo prompts.txt."""
