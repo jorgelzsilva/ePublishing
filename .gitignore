@@ -5,7 +5,7 @@ venv/
 env/
 
 # Dependencies
-epubcheck-5.1.0/
+
 
 # Output and Temp Files
 reports/
