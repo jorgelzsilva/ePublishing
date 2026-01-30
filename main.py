@@ -9,7 +9,7 @@ from pathlib import Path
 from colorama import init, Fore
 
 # Importação dos seus módulos (certifique-se que os nomes batem com os arquivos na pasta modules)
-from modules.structural import check_toc_and_pagelist, get_typesetting_credit
+from modules.structural import check_toc_and_pagelist, get_typesetting_credit, check_filenames
 from modules.css_checker import validate_css_rules, validate_limitador_and_structures
 from modules.vision_ai import check_visual_layout, get_ai_tech_advice
 import asyncio
@@ -122,7 +122,11 @@ def generate_html_report(epub_name, data):
 
     # Lista de ficheiros sem limitador
     missing_divs = data.get('limitador_missing', [])
-    missing_html = "".join([f"<li>{item}</li>" for item in missing_divs]) if missing_divs else "<li>✅ Todos os ficheiros estão OK.</li>"
+    missing_html = "".join([f"<li>{item}</li>" for item in missing_divs]) if missing_divs else "<li>✅ Todos os arquivos estão OK.</li>"
+
+    # Lista de ficheiros com nomes inválidos
+    invalid_filenames = data.get('invalid_filenames', [])
+    filenames_html = "".join([f"<li style='color:var(--error)'>⚠️ {item}</li>" for item in invalid_filenames]) if invalid_filenames else "<li>✅ Todos os nomes de arquivos estão OK.</li>"
 
     html = f"""
     <!DOCTYPE html>
@@ -423,12 +427,18 @@ def generate_html_report(epub_name, data):
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
                 <section class="card">
-                    <h2>05. CSS & Estrutura</h2>
+                    <h2>05. Estrutura & CSS</h2>
                     <ul style="list-style: none; display: flex; flex-direction: column; gap: 15px;">
                         <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
                             <span>Classe .limitador (40em)</span>
                             <span style="font-weight:700; color:{'#27ae60' if data['css_rules']['limitador_ok'] else '#c0392b'}">
                                 {"✅ OK" if data['css_rules']['limitador_ok'] else "❌ AUSENTE"}
+                            </span>
+                        </li>
+                        <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                            <span>Nomenclatura de Arquivos</span>
+                            <span style="font-weight:700; color:{'#27ae60' if not invalid_filenames else '#c0392b'}">
+                                {"✅ OK" if not invalid_filenames else f"❌ {len(invalid_filenames)} ERRO(S)"}
                             </span>
                         </li>
                         <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
@@ -438,11 +448,20 @@ def generate_html_report(epub_name, data):
                             </span>
                         </li>
                     </ul>
+
+                    <div style="margin-top: 25px;">
+                        <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Arquivos com Nomes Inválidos</h4>
+                        <div style="max-height: 150px; overflow-y: auto; font-size: 0.85rem; border: 1px solid var(--border); padding: 10px; background: #fffcfc;">
+                            <ul style="list-style: none;">
+                                {filenames_html}
+                            </ul>
+                        </div>
+                    </div>
                 </section>
 
                 <section class="card">
-                    <h2>06. Limitadores Ausentes</h2>
-                    <div style="max-height: 200px; overflow-y: auto; font-size: 0.85rem;">
+                    <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Limitadores Ausentes (.limitador)</h4>
+                    <div style="max-height: 400px; overflow-y: auto; font-size: 0.85rem;">
                         <ul style="list-style: none; color: {'var(--error)' if missing_divs else '#27ae60'}">
                             {missing_html}
                         </ul>
@@ -451,7 +470,7 @@ def generate_html_report(epub_name, data):
             </div>
 
             <section class="card">
-                <h2>07. Verificação de Links</h2>
+                <h2>06. Verificação de Links</h2>
                 <table>
                     <thead><tr><th>URL</th><th>Status</th></tr></thead>
                     <tbody>{ext_links_rows if ext_links_rows else "<tr><td colspan='2'>Nenhum link externo encontrado.</td></tr>"}</tbody>
@@ -459,14 +478,14 @@ def generate_html_report(epub_name, data):
             </section>
 
             <section class="card">
-                <h2>08. Terminal Logs</h2>
+                <h2>07. Terminal Logs</h2>
                 <div class="log-console">
                     {''.join([f'<div class="log-line">{log}</div>' for log in data.get('structure_logs', [])])}
                 </div>
             </section>
 
             <section class="card" style="margin-bottom: 100px;">
-                <h2>09. Performance</h2>
+                <h2>08. Performance</h2>
                 <div style="display: flex; flex-direction: column; gap: 12px; max-width: 500px;">
                     <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
                         <span>1. EPubCheck:</span>
@@ -489,16 +508,20 @@ def generate_html_report(epub_name, data):
                         <span style="font-weight:600;">{data['timings'].get('external_links', 0):.2f}s</span>
                     </div>
                     <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span>6. Visão IA:</span>
+                        <span>6. Nomenclatura:</span>
+                        <span style="font-weight:600;">{data['timings'].get('filenames', 0):.2f}s</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                        <span>7. Visão IA:</span>
                         <span style="font-weight:600;">{data['timings'].get('vision_ai', 0):.2f}s</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                        <span>8. Interatividade:</span>
+                        <span style="font-weight:600;">{data['timings'].get('interactivity', 0):.2f}s</span>
                     </div>
                     <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
                         <span>IA (Conselhos):</span>
                         <span style="font-weight:600;">{data['timings'].get('ai_advice', 0):.2f}s</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span>7. Interatividade:</span>
-                        <span style="font-weight:600;">{data['timings'].get('interactivity', 0):.2f}s</span>
                     </div>
                     <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
                         <span>Tokens AI:</span>
@@ -532,7 +555,7 @@ def process_single_epub(epub_path):
     print(f"\n{Fore.MAGENTA}{'='*50}\nVALIDANDO: {epub_name}\n{'='*50}")
 
     # 1. Validador Oficial (ePubCheck)
-    print(f"{Fore.YELLOW}[1/7] Executando EPubCheck (validador W3C)...")
+    print(f"{Fore.YELLOW}[1/8] Executando EPubCheck (validador W3C)...")
     s1 = time.time()
     report_data['epubcheck'] = run_epubcheck(epub_path)
     report_data['typesetter'] = get_typesetting_credit(epub_path)
@@ -546,7 +569,7 @@ def process_single_epub(epub_path):
         print(f"{Fore.GREEN}    [OK] EPubCheck: 0 erros, {eb['WARNING']} aviso(s), {eb['USAGE']} alerta(s)")
 
     # 2. Estrutura (TOC, NCX, PageList)
-    print(f"{Fore.YELLOW}[2/7] Validando TOC, PageList e Âncoras internas...")
+    print(f"{Fore.YELLOW}[2/8] Validando TOC, PageList e Âncoras internas...")
     s2 = time.time()
     structure_ok, structure_logs = check_toc_and_pagelist(epub_path)
     report_data['timings']['structure'] = time.time() - s2
@@ -554,13 +577,13 @@ def process_single_epub(epub_path):
     report_data['structure_logs'] = structure_logs
 
     # 3. Análise de CSS
-    print(f"{Fore.YELLOW}[3/7] Analisando regras nos arquivos CSS...")
+    print(f"{Fore.YELLOW}[3/8] Analisando regras nos arquivos CSS...")
     s3 = time.time()
     report_data['css_rules'] = validate_css_rules(epub_path)
     report_data['timings']['css_analysis'] = time.time() - s3
 
     # 4. Análise de Arquivos XHTML (.limitador e estruturas)
-    print(f"{Fore.YELLOW}[4/7] Verificando aplicação da div .limitador e riscos Binpar...")
+    print(f"{Fore.YELLOW}[4/8] Verificando aplicação da div .limitador e riscos Binpar...")
     s4 = time.time()
     xhtml_analysis = validate_limitador_and_structures(epub_path) # Retorna dict com logs agora
     report_data['timings']['xhtml_analysis'] = time.time() - s4
@@ -570,7 +593,7 @@ def process_single_epub(epub_path):
     report_data['binpar_structural_risks'] = xhtml_analysis["binpar_complex_warnings"]
 
     # 5. Links Externos (Status 200) - Parte ASSÍNCRONA
-    print(f"{Fore.YELLOW}[5/7] Testando links externos (Status 200)...")
+    print(f"{Fore.YELLOW}[5/8] Testando links externos (Status 200)...")
     s5 = time.time()
     from modules.link_validator import validate_external_links
     report_data['external_links'] = asyncio.run(validate_external_links(epub_path))
@@ -582,8 +605,21 @@ def process_single_epub(epub_path):
     report_data['total_completion_tokens'] = 0
     report_data['total_tokens'] = 0
 
+    # Validação de Nomes de Arquivos (Plataforma)
+    s_filenames = time.time()
+    print(f"{Fore.YELLOW}[6/8] Validando nomenclatura de arquivos...")
+    invalid_filenames = check_filenames(epub_path)
+    report_data['invalid_filenames'] = invalid_filenames
+    if invalid_filenames:
+        print(f"{Fore.RED}    [!] Nomes inválidos encontrados: {len(invalid_filenames)} itens")
+        for f_name in invalid_filenames:
+            print(f"{Fore.RED}        - {f_name}")
+    else:
+        print(f"{Fore.GREEN}    [OK] Todos os nomes de arquivos são válidos.")
+    report_data['timings']['filenames'] = time.time() - s_filenames
+
     if ENABLE_VISION_AI:
-        print(f"{Fore.YELLOW}[6/7] Executando análise de visão computacional (Amostragem)...")
+        print(f"{Fore.YELLOW}[7/8] Executando análise de visão computacional (Amostragem)...")
         raw_vision_results = check_visual_layout(epub_path, max_items=3)
         vision_processed = []
         for v in raw_vision_results:
@@ -597,7 +633,7 @@ def process_single_epub(epub_path):
             vision_processed.append(v)
         report_data['vision_results'] = vision_processed
     else:
-        print(f"{Fore.WHITE}[6/7] Análise visual desativada.")
+        print(f"{Fore.WHITE}[7/8] Análise visual desativada.")
         report_data['vision_results'] = []
     report_data['timings']['vision_ai'] = time.time() - s6
     
@@ -632,7 +668,7 @@ def process_single_epub(epub_path):
     report_data['timings']['ai_advice'] = time.time() - s_ia
 
     # 7. Atividades Interativas e Gabarito
-    print(f"{Fore.YELLOW}[7/7] Validando exercícios interativos e Gabarito...")
+    print(f"{Fore.YELLOW}[8/8] Validando exercícios interativos e Gabarito...")
     s7 = time.time()
     inter_ok, inter_logs, inter_issues = validate_activities(epub_path)
     report_data['timings']['interactivity'] = time.time() - s7

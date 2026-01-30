@@ -471,3 +471,24 @@ def get_typesetting_credit(epub_path):
         return "Não identificado"
     except Exception:
         return "Erro na extração"
+
+def check_filenames(epub_path):
+    """
+    Verifica se os nomes de arquivos dentro do EPUB seguem as restrições da plataforma:
+    A-Z, a-z, 0-9, _, - (e o ponto para extensões e barra para diretórios)
+    """
+    invalid_files = []
+    # Regex para permitir apenas Alfanuméricos, Underscore, Dash, Ponto e Barra
+    # Nota: A mensagem da plataforma não citou ponto nem barra explicitamente, 
+    # mas são essenciais para caminhos e extensões de arquivos.
+    pattern = re.compile(r'^[A-Za-z0-9_\-\./]+$')
+    
+    try:
+        with zipfile.ZipFile(epub_path, 'r') as z:
+            for file_info in z.infolist():
+                if not pattern.match(file_info.filename):
+                    invalid_files.append(file_info.filename)
+        
+        return invalid_files
+    except Exception:
+        return []
