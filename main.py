@@ -15,6 +15,7 @@ from modules.vision_ai import check_visual_layout, get_ai_tech_advice
 import asyncio
 from modules.link_validator import validate_external_links
 from modules.interactivity import validate_activities
+from modules.image_validator import validate_image_sizes
 
 # CONFIGURAÇÕES
 ENABLE_VISION_AI = False # Desativado por padrão
@@ -127,6 +128,10 @@ def generate_html_report(epub_name, data):
     # Lista de ficheiros com nomes inválidos
     invalid_filenames = data.get('invalid_filenames', [])
     filenames_html = "".join([f"<li style='color:var(--error)'>⚠️ {item}</li>" for item in invalid_filenames]) if invalid_filenames else "<li>✅ Todos os nomes de arquivos estão OK.</li>"
+
+    # Lista de imagens com tamanho excedido
+    invalid_images = data.get('invalid_images', [])
+    images_html = "".join([f"<li style='color:var(--error)'>⚠️ {item['path']} ({item['width']}x{item['height']} = {item['pixels']:,}px)</li>" for item in invalid_images]) if invalid_images else "<li>✅ Todas as imagens estão dentro do limite.</li>"
 
     html = f"""
     <!DOCTYPE html>
@@ -442,6 +447,12 @@ def generate_html_report(epub_name, data):
                             </span>
                         </li>
                         <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                            <span>Tamanho das Imagens (Máx 5.6M px)</span>
+                            <span style="font-weight:700; color:{'#27ae60' if not invalid_images else '#c0392b'}">
+                                {"✅ OK" if not invalid_images else f"❌ {len(invalid_images)} ERRO(S)"}
+                            </span>
+                        </li>
+                        <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
                             <span>Estrutura E-book</span>
                             <span style="font-weight:700; color:{'#27ae60' if data['structure_ok'] else '#e67e22'}">
                                 {"✅ ÍNTEGRA" if data['structure_ok'] else "⚠ AVISOS"}
@@ -451,9 +462,16 @@ def generate_html_report(epub_name, data):
 
                     <div style="margin-top: 25px;">
                         <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Arquivos com Nomes Inválidos</h4>
-                        <div style="max-height: 150px; overflow-y: auto; font-size: 0.85rem; border: 1px solid var(--border); padding: 10px; background: #fffcfc;">
+                        <div style="max-height: 120px; overflow-y: auto; font-size: 0.85rem; border: 1px solid var(--border); padding: 10px; background: #fffcfc; margin-bottom: 15px;">
                             <ul style="list-style: none;">
                                 {filenames_html}
+                            </ul>
+                        </div>
+
+                        <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Imagens Excedendo Limite</h4>
+                        <div style="max-height: 120px; overflow-y: auto; font-size: 0.85rem; border: 1px solid var(--border); padding: 10px; background: #fffcfc;">
+                            <ul style="list-style: none;">
+                                {images_html}
                             </ul>
                         </div>
                     </div>
@@ -518,6 +536,10 @@ def generate_html_report(epub_name, data):
                     <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
                         <span>8. Interatividade:</span>
                         <span style="font-weight:600;">{data['timings'].get('interactivity', 0):.2f}s</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                        <span>9. Tamanho de Imagens:</span>
+                        <span style="font-weight:600;">{data['timings'].get('image_sizes', 0):.2f}s</span>
                     </div>
                     <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
                         <span>IA (Conselhos):</span>
@@ -618,8 +640,19 @@ def process_single_epub(epub_path):
         print(f"{Fore.GREEN}    [OK] Todos os nomes de arquivos são válidos.")
     report_data['timings']['filenames'] = time.time() - s_filenames
 
+    # Validação de Tamanho de Imagens
+    s_images = time.time()
+    print(f"{Fore.YELLOW}[7/9] Validando dimensões das imagens (máx 5.6M px)...")
+    invalid_images = validate_image_sizes(epub_path)
+    report_data['invalid_images'] = invalid_images
+    if invalid_images:
+        print(f"{Fore.RED}    [!] Imagens excedendo limite encontradas: {len(invalid_images)} itens")
+    else:
+        print(f"{Fore.GREEN}    [OK] Todas as imagens estão dentro do limite.")
+    report_data['timings']['image_sizes'] = time.time() - s_images
+
     if ENABLE_VISION_AI:
-        print(f"{Fore.YELLOW}[7/8] Executando análise de visão computacional (Amostragem)...")
+        print(f"{Fore.YELLOW}[8/9] Executando análise de visão computacional (Amostragem)...")
         raw_vision_results = check_visual_layout(epub_path, max_items=3)
         vision_processed = []
         for v in raw_vision_results:
@@ -633,7 +666,7 @@ def process_single_epub(epub_path):
             vision_processed.append(v)
         report_data['vision_results'] = vision_processed
     else:
-        print(f"{Fore.WHITE}[7/8] Análise visual desativada.")
+        print(f"{Fore.WHITE}[8/9] Análise visual desativada.")
         report_data['vision_results'] = []
     report_data['timings']['vision_ai'] = time.time() - s6
     
@@ -668,7 +701,7 @@ def process_single_epub(epub_path):
     report_data['timings']['ai_advice'] = time.time() - s_ia
 
     # 7. Atividades Interativas e Gabarito
-    print(f"{Fore.YELLOW}[8/8] Validando exercícios interativos e Gabarito...")
+    print(f"{Fore.YELLOW}[9/9] Validando exercícios interativos e Gabarito...")
     s7 = time.time()
     inter_ok, inter_logs, inter_issues = validate_activities(epub_path)
     report_data['timings']['interactivity'] = time.time() - s7
@@ -684,6 +717,8 @@ def process_single_epub(epub_path):
     report_file = generate_html_report(epub_name, report_data)
     
     print(f"\n{Fore.GREEN}✔ Processo concluído para: {epub_name}")
+    if invalid_images:
+        print(f"{Fore.LIGHTRED_EX}👉 Alerta: {len(invalid_images)} imagens excedem o limite de pixels.")
     print(f"{Fore.CYAN}👉 Relatório: {report_file}")
 
 def main():
