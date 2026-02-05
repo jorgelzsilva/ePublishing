@@ -5,6 +5,7 @@ import json
 import subprocess
 import shutil
 import zipfile
+from lxml import etree
 from pathlib import Path
 from colorama import init, Fore
 from config import Config
@@ -101,7 +102,17 @@ def run_epubcheck(epub_path):
 def generate_html_report(epub_name, data):
     report_path = Path(f"reports/REPORT_{epub_name}.html")
     eb = data['epubcheck']
+    is_secad = data.get('is_secad', False)
     
+    # Helper para numeração dinâmica
+    class SectionCounter:
+        def __init__(self): self.count = 0
+        def next(self):
+            self.count += 1
+            return f"{self.count:02d}"
+    
+    counter = SectionCounter()
+
     error_rows = ""
     for m in eb['messages']:
         color = "var(--error)" if m['severity'] in ['FATAL', 'ERROR'] else "var(--warning)" if m['severity'] == 'WARNING' else "var(--info)"
@@ -121,11 +132,14 @@ def generate_html_report(epub_name, data):
     missing_divs = data.get('limitador_missing', [])
     marker_pass = "<span style='font-family:monospace; font-weight:bold; color:#27ae60;'>[      PASSOU      ]</span>"
     marker_fail = "<span style='font-family:monospace; font-weight:bold; color:#c0392b;'>[      FALHOU      ]</span>"
+    marker_info = "<span style='font-family:monospace; color:var(--text-muted);'>[      INFO        ]</span>"
+    marker_aviso = "<span style='font-family:monospace; font-weight:bold; color:#f39c12;'>[      AVISO       ]</span>"
+
     missing_html = "".join([f"<li>{marker_fail} {item}</li>" for item in missing_divs]) if missing_divs else f"<li>{marker_pass} Todos os arquivos estão OK.</li>"
 
     # Riscos estruturais Binpar
     binpar_risks = data.get('binpar_structural_risks', [])
-    binpar_html = "".join([f"<li style='color:#f39c12'><span style='font-family:monospace; font-weight:bold; color:#f39c12;'>[      AVISO       ]</span> {item}</li>" for item in binpar_risks]) if binpar_risks else f"<li>{marker_pass} Nenhuma estrutura crítica detectada.</li>"
+    binpar_html = "".join([f"<li style='color:#f39c12'>{marker_aviso} {item}</li>" for item in binpar_risks]) if binpar_risks else f"<li>{marker_pass} Nenhuma estrutura crítica detectada.</li>"
 
     # Lista de ficheiros com nomes inválidos
     invalid_filenames = data.get('invalid_filenames', [])
@@ -134,6 +148,16 @@ def generate_html_report(epub_name, data):
     # Lista de imagens com tamanho excedido
     invalid_images = data.get('invalid_images', [])
     images_html = "".join([f"<li style='color:var(--error)'>{marker_fail} {item['path']} ({item['width']}x{item['height']} = {item['pixels']:,}px)</li>" for item in invalid_images]) if invalid_images else f"<li>{marker_pass} Todas as imagens estão dentro do limite.</li>"
+
+    # Filtro de Terminal Logs
+    filtered_logs = []
+    for log in data.get('structure_logs', []):
+        if is_secad:
+            if ".limitador" in log or "PageList" in log or "Página" in log:
+                continue
+        filtered_logs.append(log)
+
+    header_credit = f"<span class='stat-label'>Créditos: Secad</span>" if is_secad else f"<span class='stat-label'>Créditos: {data.get('typesetter', 'Não identificado')}</span>"
 
     html = f"""
     <!DOCTYPE html>
@@ -221,34 +245,6 @@ def generate_html_report(epub_name, data):
                 box-shadow: var(--shadow);
             }}
 
-            .stats-grid {{
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 20px;
-                margin-top: 20px;
-            }}
-
-            .stat-box {{
-                padding: 20px;
-                border: 1px solid var(--border);
-                text-align: center;
-            }}
-
-            .stat-value {{
-                font-family: 'Bricolage Grotesque', sans-serif;
-                font-size: 2.5rem;
-                display: block;
-                line-height: 1;
-            }}
-
-            .stat-label {{
-                font-size: 0.75rem;
-                text-transform: uppercase;
-                letter-spacing: 0.1em;
-                font-weight: 600;
-                color: var(--text-muted);
-            }}
-
             table {{ 
                 width: 100%; 
                 border-collapse: collapse; 
@@ -271,8 +267,6 @@ def generate_html_report(epub_name, data):
                 font-size: 0.95rem;
                 vertical-align: top;
             }}
-
-            tr:hover td {{ background: #fcfcf9; }}
 
             .badge {{ 
                 display: inline-block;
@@ -321,7 +315,7 @@ def generate_html_report(epub_name, data):
                 background: #1a1a1b;
                 color: #e0e0e0;
                 padding: 25px;
-                font-family: inherit;
+                font-family: monospace;
                 font-size: 0.85rem;
                 max-height: 500px;
                 overflow-y: auto;
@@ -333,23 +327,10 @@ def generate_html_report(epub_name, data):
                 border-bottom: 1px solid #2a2a2b;
             }}
 
-            .footer-info {{
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 30px;
-                margin-top: 20px;
-            }}
-
             /* Modal Lightbox */
             .lightbox {{ display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.95); cursor: zoom-out; }}
             .lightbox-content {{ margin: auto; display: block; max-width: 90%; max-height: 90vh; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 30px 60px rgba(0,0,0,0.1); border: 1px solid var(--border); }}
             .close {{ position: absolute; top: 30px; right: 40px; color: var(--text); font-size: 3rem; font-weight: 300; cursor: pointer; }}
-
-            @media (max-width: 768px) {{
-                body {{ padding: 20px 15px; }}
-                h1 {{ font-size: 3rem; }}
-                .card {{ padding: 25px; }}
-            }}
         </style>
         <script>
             function openModal(src) {{
@@ -361,12 +342,6 @@ def generate_html_report(epub_name, data):
             function closeModal() {{
                 document.getElementById("myModal").style.display = "none";
             }}
-            window.onclick = function(event) {{
-                var modal = document.getElementById("myModal");
-                if (event.target == modal) {{
-                    modal.style.display = "none"; 
-                }}
-            }}
         </script>
     </head>
     <body>
@@ -374,13 +349,13 @@ def generate_html_report(epub_name, data):
             <header>
                 <h1>{epub_name}</h1>
                 <div class="header-meta">
-                    <span class="stat-label">Créditos: {data.get('typesetter', 'Não identificado')}</span>
+                    {header_credit}
                 </div>
             </header>
 
             <section class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
-                    <h2 style="margin-bottom:0">01. Relatório EPubCheck</h2>
+                    <h2 style="margin-bottom:0">{counter.next()}. Relatório EPubCheck</h2>
                     <div class="badge-group">
                         <span class="badge" style="background:var(--error)">{eb['FATAL'] + eb['ERROR']} Erros</span>
                         <span class="badge" style="background:var(--warning)">{eb['WARNING']} Avisos</span>
@@ -402,48 +377,91 @@ def generate_html_report(epub_name, data):
             </section>
 
             <section class="card">
-                <h2>02. IA Technical Advice <small>(Modelo: {data.get('ai_advice_model', 'N/A')})</small></h2>
+                <h2>{counter.next()}. IA Technical Advice <small>(Modelo: {data.get('ai_advice_model', 'N/A')})</small></h2>
                 <div class="ai-advice-container">
                     {data.get('ai_advice') if data.get('ai_advice') else f'{marker_pass} Nenhum erro crítico detectado para análise da IA.'}
                 </div>
             </section>
+    """
 
+    if is_secad:
+        html += f"""
             <section class="card">
-                <h2>03. Atividades Interativas</h2>
+                <h2>{counter.next()}. Atividades Interativas</h2>
                 <div style="border-left: 2px solid var(--accent); padding-left: 20px;">
                     {''.join([f'<div style="margin-bottom: 12px; font-size: 0.95rem;">{log}</div>' for log in data.get('interactivity_logs', [])]) if data.get('interactivity_logs') else "<p>Nenhuma atividade detectada.</p>"}
                 </div>
                 {f"<div style='margin-top:25px; padding:15px; background:#fff5f5; border:1px solid #feb2b2; color:#c53030; font-weight:600;'>{marker_fail} Falhas detectadas: {len(data['interactivity_issues'])} itens inconsistentes.</div>" if data.get('interactivity_issues') else ""}
             </section>
+        """
 
+    if Config.ENABLE_VISION_AI and data.get('vision_results'):
+        html += f"""
             <section class="card">
-                <h2>04. Análise Visual <small>(IA Qwen3 VL)</small></h2>
-                {
-                    ''.join([f"""
-                    <div style="margin-bottom: 40px; padding-bottom: 30px; border-bottom: 1px solid var(--border);">
-                        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:15px;">
-                            <h3 style="font-family:'Bricolage Grotesque';">{item.get('location', 'N/A')}</h3>
-                            <span class="badge" style="background:var(--text)">{item.get('type', 'Geral')}</span>
-                        </div>
-                        <p style="color:var(--text-muted); margin-bottom:20px;">{item.get('analysis', 'Sem análise')}</p>
-                        {f'<img src="{item["image_url"]}" class="screenshot-thumb" onclick="openModal(this.src)">' if item.get('image_url') else '<p><em>Sem captura de tela.</em></p>'}
+                <h2>{counter.next()}. Análise Visual <small>(IA Qwen3 VL)</small></h2>
+                {''.join([f'''
+                <div style="margin-bottom: 40px; padding-bottom: 30px; border-bottom: 1px solid var(--border);">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:15px;">
+                        <h3 style="font-family:'Bricolage Grotesque';">{item.get('location', 'N/A')}</h3>
+                        <span class="badge" style="background:var(--text)">{item.get('type', 'Geral')}</span>
                     </div>
-                    """ for item in data.get('vision_results', [])])
-                    if Config.ENABLE_VISION_AI and data.get('vision_results') else
-                    '<p style="color: var(--text-muted);"><em>Análise visual desativada ou não capturada.</em></p>'
-                }
+                    <p style="color:var(--text-muted); margin-bottom:20px;">{item.get('analysis', 'Sem análise')}</p>
+                    {f'<img src="{item["image_url"]}" class="screenshot-thumb" onclick="openModal(this.src)">' if item.get('image_url') else '<p><em>Sem captura de tela.</em></p>'}
+                </div>
+                ''' for item in data.get('vision_results')])}
             </section>
+        """
 
+    # Seção: Estrutura & CSS (com filtros condicionais)
+    limitador_li = ""
+    if not is_secad:
+        limitador_li = f"""
+            <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                <span>Classe .limitador (40em)</span>
+                <span style="font-weight:700; color:{'#27ae60' if data['css_rules']['limitador_ok'] else '#c0392b'}">
+                    {"[      PASSOU      ]" if data['css_rules']['limitador_ok'] else "[      FALHOU      ]"}
+                </span>
+            </li>
+        """
+
+    structure_title = "Estrutura E-book"
+    if is_secad:
+        structure_title = "Sumário & Links"
+
+    # Coluna da Direita (Layout de 2 colunas)
+    right_column_content = ""
+    if is_secad:
+        # Para Secad, a coluna da direita pode ficar vazia ou ter outra info, mas removemos Riscos Binpar
+        right_column_content = f"""
+                <section class="card">
+                    <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Informações Adicionais</h4>
+                    <p style="font-size: 0.9rem; color: var(--text-muted);">Validação de estrutura Secad concluída.</p>
+                </section>
+        """
+    else:
+        right_column_content = f"""
+                <section class="card">
+                    <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Limitadores Ausentes (.limitador)</h4>
+                    <div style="max-height: 400px; overflow-y: auto; font-size: 0.85rem;">
+                        <ul style="list-style: none; color: {'var(--error)' if missing_divs else '#27ae60'}">
+                            {missing_html}
+                        </ul>
+                    </div>
+                    <div style="margin-top:20px;">
+                        <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Riscos Estruturais Binpar</h4>
+                        <ul style="list-style: none;">
+                            {binpar_html}
+                        </ul>
+                    </div>
+                </section>
+        """
+
+    html += f"""
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
                 <section class="card">
-                    <h2>05. Estrutura & CSS</h2>
+                    <h2>{counter.next()}. Estrutura & CSS</h2>
                     <ul style="list-style: none; display: flex; flex-direction: column; gap: 15px;">
-                        <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
-                            <span>Classe .limitador (40em)</span>
-                            <span style="font-weight:700; color:{'#27ae60' if data['css_rules']['limitador_ok'] else '#c0392b'}">
-                                {"[      PASSOU      ]" if data['css_rules']['limitador_ok'] else "[      FALHOU      ]"}
-                            </span>
-                        </li>
+                        {limitador_li}
                         <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
                             <span>Nomenclatura de Arquivos</span>
                             <span style="font-weight:700; color:{'#27ae60' if not invalid_filenames else '#c0392b'}">
@@ -457,8 +475,8 @@ def generate_html_report(epub_name, data):
                             </span>
                         </li>
                         <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
-                            <span>Estrutura E-book</span>
-                            <span style="font-weight:700; color:{'#27ae60' if data['structure_ok'] else '#e67e22'}">
+                            <span>{structure_title}</span>
+                            <span style="font-weight:700; color:{'#27ae60' if data['structure_ok'] else '#f39c12'}">
                                 {"[      PASSOU      ]" if data['structure_ok'] else "[      AVISO       ]"}
                             </span>
                         </li>
@@ -480,19 +498,11 @@ def generate_html_report(epub_name, data):
                         </div>
                     </div>
                 </section>
-
-                <section class="card">
-                    <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Limitadores Ausentes (.limitador)</h4>
-                    <div style="max-height: 400px; overflow-y: auto; font-size: 0.85rem;">
-                        <ul style="list-style: none; color: {'var(--error)' if missing_divs else '#27ae60'}">
-                            {missing_html}
-                        </ul>
-                    </div>
-                </section>
+                {right_column_content}
             </div>
 
             <section class="card">
-                <h2>06. Verificação de Links</h2>
+                <h2>{counter.next()}. Verificação de Links</h2>
                 <table>
                     <thead><tr><th>URL</th><th>Status</th></tr></thead>
                     <tbody>{ext_links_rows if ext_links_rows else "<tr><td colspan='2'>Nenhum link externo encontrado.</td></tr>"}</tbody>
@@ -500,62 +510,64 @@ def generate_html_report(epub_name, data):
             </section>
 
             <section class="card">
-                <h2>07. Terminal Logs</h2>
+                <h2>{counter.next()}. Terminal Logs</h2>
                 <div class="log-console">
-                    {''.join([f'<div class="log-line">{log}</div>' for log in data.get('structure_logs', [])])}
+                    {''.join([f'<div class="log-line">{log}</div>' for log in filtered_logs])}
                 </div>
             </section>
 
             <section class="card" style="margin-bottom: 100px;">
-                <h2>08. Performance</h2>
-                <div style="display: flex; flex-direction: column; gap: 12px; max-width: 500px;">
-                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span>1. EPubCheck:</span>
-                        <span style="font-weight:600;">{data['timings'].get('epubcheck', 0):.2f}s</span>
+                <h2>{counter.next()}. Performance</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                            <span style="font-size: 0.9rem; color: var(--text-muted);">EPubCheck:</span>
+                            <span style="font-weight:600;">{data['timings'].get('epubcheck', 0):.2f}s</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                            <span style="font-size: 0.9rem; color: var(--text-muted);">Estrutura:</span>
+                            <span style="font-weight:600;">{data['timings'].get('structure', 0):.2f}s</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                            <span style="font-size: 0.9rem; color: var(--text-muted);">Análise CSS:</span>
+                            <span style="font-weight:600;">{data['timings'].get('css_analysis', 0):.2f}s</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                            <span style="font-size: 0.9rem; color: var(--text-muted);">Links Externos:</span>
+                            <span style="font-weight:600;">{data['timings'].get('external_links', 0):.2f}s</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                            <span style="font-size: 0.9rem; color: var(--text-muted);">Nomenclatura:</span>
+                            <span style="font-weight:600;">{data['timings'].get('filenames', 0):.2f}s</span>
+                        </div>
                     </div>
-                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span>2. Estrutura (TOC/NCX):</span>
-                        <span style="font-weight:600;">{data['timings'].get('structure', 0):.2f}s</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span>3. Análise de CSS:</span>
-                        <span style="font-weight:600;">{data['timings'].get('css_analysis', 0):.2f}s</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span>4. Análise XHTML:</span>
-                        <span style="font-weight:600;">{data['timings'].get('xhtml_analysis', 0):.2f}s</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span>5. Links Externos:</span>
-                        <span style="font-weight:600;">{data['timings'].get('external_links', 0):.2f}s</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span>6. Nomenclatura:</span>
-                        <span style="font-weight:600;">{data['timings'].get('filenames', 0):.2f}s</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span>7. Visão IA:</span>
-                        <span style="font-weight:600;">{data['timings'].get('vision_ai', 0):.2f}s</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span>8. Interatividade:</span>
-                        <span style="font-weight:600;">{data['timings'].get('interactivity', 0):.2f}s</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span>9. Tamanho de Imagens:</span>
-                        <span style="font-weight:600;">{data['timings'].get('image_sizes', 0):.2f}s</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span>IA (Conselhos):</span>
-                        <span style="font-weight:600;">{data['timings'].get('ai_advice', 0):.2f}s</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span>Tokens AI:</span>
-                        <span style="font-weight:600; color:var(--accent)">{data.get('total_tokens', 0)}</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; border-top: 2px solid var(--text); padding-top: 15px; margin-top: 5px;">
-                        <span style="font-weight:700; text-transform: uppercase; letter-spacing: 0.05em;">Tempo Total:</span>
-                        <span style="font-weight:700; color: #27ae60; font-size: 1.2rem;">{data['timings'].get('total', 0):.2f}s</span>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                            <span style="font-size: 0.9rem; color: var(--text-muted);">Visão IA:</span>
+                            <span style="font-weight:600;">{data['timings'].get('vision_ai', 0):.2f}s</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                            <span style="font-size: 0.9rem; color: var(--text-muted);">Conselhos IA:</span>
+                            <span style="font-weight:600;">{data['timings'].get('ai_advice', 0):.2f}s</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                            <span style="font-size: 0.9rem; color: var(--text-muted);">Imagens:</span>
+                            <span style="font-weight:600;">{data['timings'].get('image_sizes', 0):.2f}s</span>
+                        </div>
+                        {f'''
+                        <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                            <span style="font-size: 0.9rem; color: var(--text-muted);">Interatividade:</span>
+                            <span style="font-weight:600;">{data['timings'].get('interactivity', 0):.2f}s</span>
+                        </div>
+                        ''' if is_secad else ''}
+                        <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                            <span style="font-size: 0.9rem; color: var(--text-muted);">Tokens IA:</span>
+                            <span style="font-weight:700; color:var(--accent)">{data.get('total_tokens', 0)}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; border-top: 2px solid var(--text); padding-top: 10px; margin-top: 5px;">
+                            <span style="font-weight:700; text-transform: uppercase;">Total:</span>
+                            <span style="font-weight:700; color: #27ae60; font-size: 1.1rem;">{data['timings'].get('total', 0):.2f}s</span>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -568,9 +580,26 @@ def generate_html_report(epub_name, data):
     </body>
     </html>
     """
-    with open(report_path, "w", encoding="utf-8") as f:
+    with open(report_path, 'w', encoding='utf-8') as f:
         f.write(html)
     return report_path
+
+def get_publisher(epub_path):
+    try:
+        with zipfile.ZipFile(epub_path, 'r') as z:
+            # Encontra o arquivo OPF
+            opf_path = next((f for f in z.namelist() if f.endswith('.opf')), None)
+            if opf_path:
+                content = z.read(opf_path).decode('utf-8', errors='ignore')
+                tree = etree.fromstring(content.encode('utf-8'))
+                # DC namespaces
+                ns = {'dc': 'http://purl.org/dc/elements/1.1/', 'opf': 'http://www.idpf.org/2007/opf'}
+                publisher = tree.xpath('//dc:publisher/text()', namespaces=ns)
+                if publisher:
+                    return publisher[0].strip()
+    except:
+        pass
+    return "Desconhecido"
 
 def process_single_epub(epub_path):
     import time # Added import for time module
@@ -580,8 +609,16 @@ def process_single_epub(epub_path):
 
     print(f"\n{Fore.MAGENTA}{'='*50}\nVALIDANDO: {epub_name}\n{'='*50}")
 
+    # Detecta Publisher
+    publisher = get_publisher(epub_path)
+    is_secad = "Artmed Panamericana" in publisher
+    report_data['publisher'] = publisher
+    report_data['is_secad'] = is_secad
+    print(f"{Fore.CYAN}    [ INFO ] Editora detectada: {publisher}")
+
+    step = 1
     # 1. Validador Oficial (ePubCheck)
-    print(f"{Fore.YELLOW}[1/8] Executando EPubCheck (validador W3C)...")
+    print(f"{Fore.YELLOW}[{step}] Executando EPubCheck (validador W3C)...")
     s1 = time.time()
     report_data['epubcheck'] = run_epubcheck(epub_path)
     report_data['typesetter'] = get_typesetting_credit(epub_path)
@@ -594,8 +631,9 @@ def process_single_epub(epub_path):
     else:
         print(f"{Fore.GREEN}    [      PASSOU      ] EPubCheck: 0 erros, {eb['WARNING']} aviso(s), {eb['USAGE']} alerta(s)")
 
+    step += 1
     # 2. Estrutura (TOC, NCX, PageList)
-    print(f"{Fore.YELLOW}[2/8] Validando TOC, PageList e Âncoras internas...")
+    print(f"{Fore.YELLOW}[{step}] Validando TOC, PageList e Âncoras internas...")
     s2 = time.time()
     structure_ok, structure_logs = check_toc_and_pagelist(epub_path)
     report_data['timings']['structure'] = time.time() - s2
@@ -606,24 +644,30 @@ def process_single_epub(epub_path):
     else:
         print(f"    [      FALHOU      ] Problemas na estrutura detectados.")
 
+    step += 1
     # 3. Análise de CSS
-    print(f"{Fore.YELLOW}[3/8] Analisando regras nos arquivos CSS...")
+    print(f"{Fore.YELLOW}[{step}] Analisando regras nos arquivos CSS...")
     s3 = time.time()
     report_data['css_rules'] = validate_css_rules(epub_path)
     report_data['timings']['css_analysis'] = time.time() - s3
 
+    step += 1
     # 4. Análise de Arquivos XHTML (.limitador e estruturas)
-    print(f"{Fore.YELLOW}[4/8] Verificando aplicação da div .limitador e riscos Binpar...")
+    if is_secad:
+        print(f"{Fore.YELLOW}[{step}] Verificando aplicação da div .limitador...")
+    else:
+        print(f"{Fore.YELLOW}[{step}] Verificando aplicação da div .limitador e riscos Binpar...")
     s4 = time.time()
-    xhtml_analysis = validate_limitador_and_structures(epub_path) # Retorna dict com logs agora
+    xhtml_analysis = validate_limitador_and_structures(epub_path, is_secad=is_secad)
     report_data['timings']['xhtml_analysis'] = time.time() - s4
-    report_data['css'] = xhtml_analysis # Store the full dictionary
+    report_data['css'] = xhtml_analysis
     report_data['structure_logs'].extend(report_data['css'].get('detailed_logs', []))
     report_data['limitador_missing'] = xhtml_analysis["missing_limitador"]
     report_data['binpar_structural_risks'] = xhtml_analysis["binpar_complex_warnings"]
 
+    step += 1
     # 5. Links Externos (Status 200) - Parte ASSÍNCRONA
-    print(f"{Fore.YELLOW}[5/8] Testando links externos (Status 200)...")
+    print(f"{Fore.YELLOW}[{step}] Testando links externos (Status 200)...")
     s5 = time.time()
     from modules.link_validator import validate_external_links
     report_data['external_links'] = asyncio.run(validate_external_links(epub_path))
@@ -635,38 +679,28 @@ def process_single_epub(epub_path):
         print(f"{Fore.GREEN}    [      PASSOU      ] Todos os links externos estão OK.")
     report_data['timings']['external_links'] = time.time() - s5
 
-    # 6. Visão Computacional (IA Qwen3 VL)
-    s6 = time.time()
-    report_data['total_prompt_tokens'] = 0
-    report_data['total_completion_tokens'] = 0
-    report_data['total_tokens'] = 0
-
-    # Validação de Nomes de Arquivos (Plataforma)
+    step += 1
+    # 6. Validação de Nomes de Arquivos (Plataforma)
     s_filenames = time.time()
-    print(f"{Fore.YELLOW}[6/8] Validando nomenclatura de arquivos...")
+    print(f"{Fore.YELLOW}[{step}] Validando nomenclatura de arquivos...")
     invalid_filenames = check_filenames(epub_path)
     report_data['invalid_filenames'] = invalid_filenames
     if invalid_filenames:
         print(f"{Fore.RED}    [      FALHOU      ] Nomes inválidos encontrados: {len(invalid_filenames)} itens")
-        for f_name in invalid_filenames:
-            print(f"{Fore.RED}        - {f_name}")
     else:
         print(f"{Fore.GREEN}    [      PASSOU      ] Todos os nomes de arquivos são válidos.")
     report_data['timings']['filenames'] = time.time() - s_filenames
 
-    # Validação de Tamanho e Qualidade de Imagens
-    s_images = time.time()
-    print(f"{Fore.YELLOW}[7/9] Validando dimensões e qualidade das imagens...")
-    image_results = validate_image_sizes(epub_path, max_pixels=Config.MAX_IMAGE_PIXELS)
-    report_data['invalid_images'] = image_results
-    if image_results:
-        print(f"{Fore.RED}    [      FALHOU      ] Imagens excedendo limite encontradas: {len(image_results)} itens")
-    else:
-        print(f"{Fore.GREEN}    [      PASSOU      ] Todas as imagens estão dentro do limite.")
-    report_data['timings']['image_sizes'] = time.time() - s_images
+    # 7. Visão Computacional (Opcional)
+    s6 = time.time()
+    report_data['total_prompt_tokens'] = 0
+    report_data['total_completion_tokens'] = 0
+    report_data['total_tokens'] = 0
+    report_data['vision_results'] = []
 
     if Config.ENABLE_VISION_AI:
-        print(f"{Fore.YELLOW}[8/9] Executando análise de visão computacional (Amostragem)...")
+        step += 1
+        print(f"{Fore.YELLOW}[{step}] Executando análise de visão computacional (Amostragem)...")
         raw_vision_results = check_visual_layout(epub_path, max_items=3)
         vision_processed = []
         for v in raw_vision_results:
@@ -676,17 +710,16 @@ def process_single_epub(epub_path):
                 report_data['total_completion_tokens'] += u.get("completion_tokens", 0)
                 report_data['total_tokens'] += u.get("total_tokens", 0)
                 v["tokens"] = u.get("total_tokens", 0)
-                v["analysis"] = v["content"] # No dict, content é o texto
+                v["analysis"] = v["content"]
             vision_processed.append(v)
         report_data['vision_results'] = vision_processed
     else:
-        print(f"{Fore.WHITE}[8/9] Análise visual desativada.")
-        report_data['vision_results'] = []
+        print(f"{Fore.WHITE}    [ INFO ] Análise visual desativada.")
     report_data['timings']['vision_ai'] = time.time() - s6
-    
-    # Adicional: Conselhos da IA para erros técnicos
-    print(f"{Fore.BLUE}[IA] Consultando IA para conselhos técnicos sobre o EPubCheck...")
-    print(f"{Fore.WHITE}    [DEBUG] Enviando {len(report_data['epubcheck']['messages'])} mensagens para análise.")
+
+    # 8. Conselhos Técnicos da IA
+    step += 1
+    print(f"{Fore.BLUE}[{step}] Consultando IA para conselhos técnicos sobre o EPubCheck...")
     s_ia = time.time()
     ia_res = get_ai_tech_advice(report_data['epubcheck']['messages'])
     raw_advice = ia_res.get("content", "")
@@ -697,34 +730,47 @@ def process_single_epub(epub_path):
         report_data['total_prompt_tokens'] += usage.get("prompt_tokens", 0)
         report_data['total_completion_tokens'] += usage.get("completion_tokens", 0)
         report_data['total_tokens'] += usage.get("total_tokens", 0)
-        report_data['advice_tokens'] = usage.get("total_tokens", 0)
 
     report_data['ai_advice_model'] = advice_model
     if raw_advice:
         import re
         import html
-        # Escapa caracteres HTML para que tags sugeridas pela IA não quebrem o layout do relatório
         escaped_advice = html.escape(raw_advice)
-        # Converte **texto** (que pode conter aspas internas vindo da IA) para <b>texto</b>
-        # A IA foi instruída a colocar aspas dentro do negrito
         advice_html = re.sub(r'\*\*([^\*]+)\*\*', r"<b>\1</b>", escaped_advice)
-        # Converte quebras de linha em <br> 
         report_data['ai_advice'] = advice_html.replace("\n", "<br>")
     else:
         report_data['ai_advice'] = ""
     report_data['timings']['ai_advice'] = time.time() - s_ia
 
-    # 7. Atividades Interativas e Gabarito
-    print(f"{Fore.YELLOW}[9/9] Validando exercícios interativos e Gabarito...")
-    s7 = time.time()
-    inter_ok, inter_logs, inter_issues = validate_activities(epub_path)
-    report_data['timings']['interactivity'] = time.time() - s7
-    report_data['interactivity_logs'] = inter_logs
-    report_data['interactivity_issues'] = inter_issues
-    if inter_issues:
-        print(f"{Fore.RED}    [      FALHOU      ] {len(inter_issues)} falhas em atividades interativas.")
+    step += 1
+    # 7. Validação de Tamanho e Qualidade de Imagens
+    print(f"{Fore.YELLOW}[{step}] Validando dimensões e qualidade das imagens...")
+    s_images = time.time()
+    image_results = validate_image_sizes(epub_path, max_pixels=Config.MAX_IMAGE_PIXELS)
+    report_data['invalid_images'] = image_results
+    if image_results:
+        print(f"{Fore.RED}    [      FALHOU      ] Imagens excedendo limite encontradas: {len(image_results)} itens")
     else:
-        print(f"{Fore.GREEN}    [      PASSOU      ] Todas as atividades interativas validadas com sucesso.")
+        print(f"{Fore.GREEN}    [      PASSOU      ] Todas as imagens estão dentro do limite.")
+    report_data['timings']['image_sizes'] = time.time() - s_images
+
+    if is_secad:
+        step += 1
+        # 8. Atividades Interativas e Gabarito
+        print(f"{Fore.YELLOW}[{step}] Validando exercícios interativos e Gabarito...")
+        s_inter = time.time()
+        inter_ok, inter_logs, inter_issues = validate_activities(epub_path)
+        report_data['timings']['interactivity'] = time.time() - s_inter
+        report_data['interactivity_logs'] = inter_logs
+        report_data['interactivity_issues'] = inter_issues
+        if inter_issues:
+            print(f"{Fore.RED}    [      FALHOU      ] {len(inter_issues)} falhas em atividades interativas.")
+        else:
+            print(f"{Fore.GREEN}    [      PASSOU      ] Todas as atividades interativas validadas com sucesso.")
+    else:
+        inter_logs = []
+        report_data['interactivity_logs'] = []
+        report_data['interactivity_issues'] = []
     report_data['structure_logs'].extend(inter_logs)
 
     # Tempo total
