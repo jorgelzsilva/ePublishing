@@ -381,7 +381,7 @@ def generate_html_report(epub_name, data):
     if data.get('ai_advice'):
         html += f"""
             <section class="card">
-                <h2>{counter.next()}. IA Technical Advice <small>(Modelo: {data.get('ai_advice_model', 'N/A')})</small></h2>
+                <h2>{counter.next()}. Análise por IA <small>(Modelo: {data.get('ai_advice_model', 'N/A')})</small></h2>
                 <div class="ai-advice-container">
                     {data.get('ai_advice')}
                 </div>
@@ -402,7 +402,7 @@ def generate_html_report(epub_name, data):
     if Config.ENABLE_VISION_AI and data.get('vision_results'):
         html += f"""
             <section class="card">
-                <h2>{counter.next()}. Análise Visual <small>(IA Qwen3 VL)</small></h2>
+                <h2>{counter.next()}. Análise Visual por IA <small>(IA Qwen3 VL)</small></h2>
                 {''.join([f'''
                 <div style="margin-bottom: 40px; padding-bottom: 30px; border-bottom: 1px solid var(--border);">
                     <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:15px;">
@@ -463,7 +463,7 @@ def generate_html_report(epub_name, data):
     html += f"""
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
                 <section class="card">
-                    <h2>{counter.next()}. Estrutura & CSS</h2>
+                    <h2>{counter.next()}. Estrutura</h2>
                     <ul style="list-style: none; display: flex; flex-direction: column; gap: 15px;">
                         {limitador_li}
                         <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
@@ -514,7 +514,7 @@ def generate_html_report(epub_name, data):
             </section>
 
             <section class="card">
-                <h2>{counter.next()}. Terminal Logs</h2>
+                <h2>{counter.next()}. Logs detalhados</h2>
                 <div class="log-console">
                     {''.join([f'<div class="log-line">{log}</div>' for log in filtered_logs])}
                 </div>
