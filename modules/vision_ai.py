@@ -237,7 +237,7 @@ def get_ai_tech_advice(errors):
     except Exception as ex:
         print(f"{Fore.RED}    [DEBUG] Erro na API de IA (Conselhos): {ex}")
         return {
-            "content": f"<p style='color:red'>Erro ao consultar IA para conselhos técnicos: {str(ex)}</p>",
+            "content": "",
             "model": "Erro/Desconhecido",
             "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         }

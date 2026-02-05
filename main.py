@@ -375,11 +375,15 @@ def generate_html_report(epub_name, data):
                     </tbody>
                 </table>
             </section>
+    """
 
+    # Seção condicional: IA Technical Advice (só mostra se houver conteúdo válido)
+    if data.get('ai_advice'):
+        html += f"""
             <section class="card">
                 <h2>{counter.next()}. IA Technical Advice <small>(Modelo: {data.get('ai_advice_model', 'N/A')})</small></h2>
                 <div class="ai-advice-container">
-                    {data.get('ai_advice') if data.get('ai_advice') else f'{marker_pass} Nenhum erro crítico detectado para análise da IA.'}
+                    {data.get('ai_advice')}
                 </div>
             </section>
     """
