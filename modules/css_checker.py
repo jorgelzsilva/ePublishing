@@ -30,7 +30,7 @@ def validate_css_rules(epub_path):
                         })
         return results
     except Exception as e:
-        print(f"{Fore.RED}    [!] Erro ao analisar arquivos CSS: {e}")
+        print(f"{Fore.RED}    [      FALHOU      ] Erro ao analisar arquivos CSS: {e}")
         return results
 
 def validate_limitador_and_structures(epub_path):
@@ -58,23 +58,23 @@ def validate_limitador_and_structures(epub_path):
                     # 1. Checagem da div .limitador (Case-insensitive e suportando múltiplas classes)
                     if not re.search(r'class\s*=\s*["\'][^"\']*limitador[^"\']*["\']', content, re.IGNORECASE):
                         analysis_results["missing_limitador"].append(html)
-                        file_log.append("❌ Div .limitador ausente")
+                        file_log.append("<span style='font-family:monospace; color:#c0392b;'>[      FALHOU      ]</span> Div .limitador ausente")
                     else:
-                        file_log.append("✅ Div .limitador presente")
+                        file_log.append("<span style='font-family:monospace; color:#27ae60;'>[      PASSOU      ]</span> Div .limitador presente")
                     
                     # 2. Checagem de estruturas complexas (Binpar High Risk)
                     # Lista dentro de Tabela
                     if "<table>" in content and ("<ul>" in content or "<ol>" in content):
                         msg = f"{html} (Lista dentro de Tabela)"
                         analysis_results["binpar_complex_warnings"].append(msg)
-                        file_log.append("⚠️ Estrutura complexa: Lista dentro de Tabela")
+                        file_log.append("<span style='font-family:monospace; color:#f39c12;'>[      AVISO       ]</span> Estrutura complexa: Lista dentro de Tabela")
                     
                     # Lista dentro de Div (Risco Médio)
                     elif "<div>" in content and ("<ul>" in content or "<ol>" in content):
                         # Só alerta se houver uma div imediatamente pai ou próxima
                         msg = f"{html} (Lista dentro de Div)"
                         analysis_results["binpar_complex_warnings"].append(msg)
-                        file_log.append("⚠️ Estrutura complexa: Lista dentro de Div")
+                        file_log.append("<span style='font-family:monospace; color:#f39c12;'>[      AVISO       ]</span> Estrutura complexa: Lista dentro de Div")
                     
                     # Se houver erros ou warnings, ou apenas para constar, adiciona ao log detalhado
                     # Para não poluir, vamos logar tudo
@@ -82,12 +82,12 @@ def validate_limitador_and_structures(epub_path):
         
         # Logs de console para feedback imediato
         if analysis_results["missing_limitador"]:
-            print(f"{Fore.RED}    [X] .limitador AUSENTE em {len(analysis_results['missing_limitador'])} arquivos.")
+            print(f"{Fore.RED}    [      FALHOU      ] .limitador AUSENTE em {len(analysis_results['missing_limitador'])} arquivos.")
         else:
-            print(f"{Fore.GREEN}    [OK] Classe .limitador aplicada em todos os arquivos.")
+            print(f"{Fore.GREEN}    [      PASSOU      ] Classe .limitador aplicada em todos os arquivos.")
             
         return analysis_results
     except Exception as e:
-        print(f"{Fore.RED}    [!] Erro na varredura de XHTML: {e}")
-        analysis_results["detailed_logs"].append(f"❌ Erro crítico na varredura: {str(e)}")
+        print(f"{Fore.RED}    [      FALHOU      ] Erro na varredura de XHTML: {e}")
+        analysis_results["detailed_logs"].append(f"<span style='font-family:monospace; color:#c0392b;'>[      FALHOU      ]</span> Erro crítico na varredura: {str(e)}")
         return analysis_results

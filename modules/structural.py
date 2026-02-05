@@ -51,7 +51,7 @@ def check_toc_and_pagelist(epub_path):
                         if links_to_check:
                             logs.append(f"📚 <strong>Sumário Técnico:</strong> {toc_type}")
                             logs.append(f"   └─ Arquivo: <code>{nav_file}</code>")
-                            print(f"    [OK] Sumário Nav detectado.")
+                            print(f"    [      PASSOU      ] Sumário Nav detectado.")
                     except:
                         pass
 
@@ -73,7 +73,7 @@ def check_toc_and_pagelist(epub_path):
                     toc_type = "NCX (EPUB 2)"
                     logs.append(f"📚 <strong>Sumário Técnico:</strong> {toc_type}")
                     logs.append(f"   └─ Arquivo: <code>{ncx_file}</code>")
-                    print(f"    [OK] Sumário NCX detectado.")
+                    print(f"    [      PASSOU      ] Sumário NCX detectado.")
             
             # Se não achou PageList no Nav ou NCX, tenta no Sumário Visual (EPUB 3 structure)
             if not pages_data and visual_toc_file:
@@ -134,24 +134,24 @@ def check_toc_and_pagelist(epub_path):
             logs.append(f"📖 <strong>Links do Sumário Técnico:</strong> {len(links_to_check)} itens")
             
             if broken > 0:
-                msg = f"❌ {broken} links do sumário estão quebrados ou órfãos."
-                logs.append(f"   └─ <span style='color:#e74c3c'>{msg}</span>")
+                msg = f"{broken} links do sumário estão quebrados ou órfãos."
+                logs.append(f"   └─ <span style='font-family:monospace; font-weight:bold; color:#c0392b;'>[      FALHOU      ]</span> └─ {msg}")
                 for bl in broken_links:
-                    logs.append(f"      ⚠️ \"{bl['label']}\" → <code>{bl['target']}</code> (NÃO ENCONTRADO)")
-                print(f"{Fore.RED}    [X] {msg}")
+                    logs.append(f"      <span style='font-family:monospace; color:#c0392b;'>[      FALHOU      ]</span> \"{bl['label']}\" → <code>{bl['target']}</code> (NÃO ENCONTRADO)")
+                print(f"{Fore.RED}    [      FALHOU      ] {msg}")
             else:
-                msg = f"✅ {len(links_to_check)} links validados com sucesso."
-                logs.append(f"   └─ <span style='color:#27ae60'>{msg}</span>")
+                msg = f"{len(links_to_check)} links validados com sucesso."
+                logs.append(f"   └─ <span style='font-family:monospace; font-weight:bold; color:#27ae60;'>[      PASSOU      ]</span> └─ {msg}")
                 for vl in valid_links:
-                    logs.append(f"      ✓ \"{vl['label']}\" → <code>{vl['target']}</code>")
-                print(f"{Fore.GREEN}    [OK] {msg}")
+                    logs.append(f"      <span style='font-family:monospace; color:#27ae60;'>[      PASSOU      ]</span> \"{vl['label']}\" → <code>{vl['target']}</code>")
+                print(f"{Fore.GREEN}    [      PASSOU      ] {msg}")
             
             # ===== VALIDAÇÃO DO SUMÁRIO VISUAL (HTML) =====
             if visual_toc_file:
                 logs.append(f"")
                 logs.append(f"📑 <strong>Sumário Visual (HTML):</strong>")
                 logs.append(f"   └─ Arquivo: <code>{visual_toc_file}</code>")
-                print(f"    [OK] Sumário visual detectado: {visual_toc_file}")
+                print(f"    [      PASSOU      ] Sumário visual detectado: {visual_toc_file}")
                 
                 with z.open(visual_toc_file) as f:
                     content_bytes = f.read()
@@ -239,9 +239,9 @@ def check_toc_and_pagelist(epub_path):
                                                 found = norm_extreme(text_inside_a) in norm_extreme(target_text_all)
 
                                         if found:
-                                            content_status = "<small style='color:#27ae60'>(Conteúdo verificado)</small> "
+                                            content_status = "<span style='font-family:monospace; color:#27ae60;'>[      PASSOU      ]</span> (Conteúdo verificado) "
                                         else:
-                                            content_status = "<small style='color:#e74c3c'>(⚠️ Texto não encontrado no conteúdo!)</small> "
+                                            content_status = "<span style='font-family:monospace; color:#e74c3c;'>[      FALHOU      ]</span> (⚠️ Texto não encontrado!) "
                                             label_content_errors.append({
                                                 "label": text_inside_a,
                                                 "file": clean_href
@@ -275,17 +275,17 @@ def check_toc_and_pagelist(epub_path):
                     logs.append(f"📖 <strong>Links do Sumário Visual:</strong> {len(visual_valid) + len(visual_broken)} itens")
                     
                     if visual_broken:
-                        logs.append(f"   └─ <span style='color:#e74c3c'>❌ {len(visual_broken)} links quebrados</span>")
+                        logs.append(f"   └─ <span style='font-family:monospace; font-weight:bold; color:#c0392b;'>[      FALHOU      ]</span> {len(visual_broken)} links quebrados")
                         for bl in visual_broken:
-                            logs.append(f"      ⚠️ \"{bl['label']}\" → <code>{bl['target']}</code> (NÃO ENCONTRADO)")
-                        print(f"{Fore.RED}    [X] Sumário visual: {len(visual_broken)} links quebrados")
+                            logs.append(f"      <span style='font-family:monospace; color:#c0392b;'>[      FALHOU      ]</span> \"{bl['label']}\" → <code>{bl['target']}</code> (NÃO ENCONTRADO)")
+                        print(f"{Fore.RED}    [      FALHOU      ] Sumário visual: {len(visual_broken)} links quebrados")
                     else:
-                        logs.append(f"   └─ <span style='color:#27ae60'>✅ {len(visual_valid)} links validados</span>")
-                        print(f"{Fore.GREEN}    [OK] Sumário visual: {len(visual_valid)} links validados")
+                        logs.append(f"   └─ <span style='font-family:monospace; font-weight:bold; color:#27ae60;'>[      PASSOU      ]</span> {len(visual_valid)} links validados")
+                        print(f"{Fore.GREEN}    [      PASSOU      ] Sumário visual: {len(visual_valid)} links validados")
                     
                     # Mostra todos os links do sumário visual com status de verificação
                     for vl in visual_valid:
-                        logs.append(f"      {vl['status']}✓ \"{vl['label']}\" → <code>{vl['target']}</code>")
+                        logs.append(f"      {vl['status']} \"{vl['label']}\" → <code>{vl['target']}</code>")
                     
                     # Relatório de duplicados
                     dups = [h for h, c in duplicate_links.items() if c > 1]
@@ -300,15 +300,15 @@ def check_toc_and_pagelist(epub_path):
                         logs.append(f"")
                         logs.append(f"❓ <strong>Inconsistência de Conteúdo:</strong>")
                         for lce in label_content_errors:
-                            logs.append(f"   └─ Texto <code>\"{lce['label']}\"</code> não encontrado em <code>{lce['file']}</code>")
-                        print(f"{Fore.YELLOW}    [!] {len(label_content_errors)} títulos não encontrados no conteúdo de destino")
+                            logs.append(f"   └─ <span style='font-family:monospace; color:#f39c12;'>[      AVISO       ]</span> Texto <code>\"{lce['label']}\"</code> não encontrado em <code>{lce['file']}</code>")
+                        print(f"{Fore.YELLOW}    [      AVISO       ] {len(label_content_errors)} títulos não encontrados no conteúdo de destino")
 
                     # Texto sem link
                     if len(unlinked) > 10:
                         logs.append(f"")
                         logs.append(f"⚠️ <strong>Texto sem link detectado no Sumário:</strong>")
-                        logs.append(f"   └─ <em>\"{unlinked[:100]}...\"</em>")
-                        print(f"{Fore.YELLOW}    [!] Texto sem link detectado no sumário visual")
+                        logs.append(f"   └─ <span style='font-family:monospace; color:#f39c12;'>[      AVISO       ]</span> <em>\"{unlinked[:100]}...\"</em>")
+                        print(f"{Fore.YELLOW}    [      AVISO       ] Texto sem link detectado no sumário visual")
 
                     # Warnings sobre títulos parcialmente fora do <a>
                     if title_warnings:
@@ -323,23 +323,22 @@ def check_toc_and_pagelist(epub_path):
                         logs.append(f"")
                         logs.append(f"❌ <strong>Âncoras não encontradas:</strong>")
                         for ae in anchor_errors:
-                            logs.append(f"   └─ <code>#{ae['anchor']}</code> não existe em <code>{ae['file']}</code>")
-                        print(f"{Fore.RED}    [X] {len(anchor_errors)} âncoras não encontradas nos arquivos destino")
+                            logs.append(f"   └─ <span style='font-family:monospace; color:#c0392b;'>[      FALHOU      ]</span> <code>#{ae['anchor']}</code> não existe em <code>{ae['file']}</code>")
+                        print(f"{Fore.RED}    [      FALHOU      ] {len(anchor_errors)} âncoras não encontradas nos arquivos destino")
             
             # Validação Modular da PageList
             if pages_data:
                 pl_ok, pl_logs = validate_pagelist_integrity(z, pages_data)
                 logs.extend(pl_logs)
             else:
-                logs.append("")
                 logs.append("ℹ️ Nenhuma PageList encontrada (opcional para EPUB 3).")
-                print(f"{Fore.YELLOW}    [!] Nenhuma PageList encontrada.")
+                print(f"{Fore.YELLOW}    [      AVISO       ] Nenhuma PageList encontrada.")
 
             return True, logs
     except Exception as e:
-        msg = f"❌ Erro estrutural crítico: {e}"
-        logs.append(msg)
-        print(f"{Fore.RED}    [!] {msg}")
+        msg = f"Erro estrutural crítico: {e}"
+        logs.append(f"<span style='font-family:monospace; color:#c0392b;'>[      FALHOU      ]</span> {msg}")
+        print(f"{Fore.RED}    [      FALHOU      ] {msg}")
         return False, logs
 
 def validate_pagelist_integrity(z, pages_data):
@@ -373,10 +372,10 @@ def validate_pagelist_integrity(z, pages_data):
             last_val = current_val
 
     if sequence_errors:
-        logs.append(f"   └─ <span style='color:#f39c12'>⚠️ Sequência numérica com saltos:</span> {', '.join(sequence_errors)}")
+        logs.append(f"   └─ <span style='font-family:monospace; color:#f39c12;'>[      AVISO       ]</span> ⚠️ Sequência numérica com saltos: {', '.join(sequence_errors)}")
     if duplicate_pages:
         dup_list = [str(k) for k in duplicate_pages.keys()]
-        logs.append(f"   └─ <span style='color:#e74c3c'>❌ Páginas repetidas detectadas:</span> {', '.join(dup_list)}")
+        logs.append(f"   └─ <span style='font-family:monospace; color:#c0392b;'>[      FALHOU      ]</span> Páginas repetidas detectadas: {', '.join(dup_list)}")
 
     # 2. Validação de Existência de IDs (Âncoras)
     broken_ids = []
@@ -417,11 +416,11 @@ def validate_pagelist_integrity(z, pages_data):
                 broken_ids.append(f"ID <code>#{anchor}</code> não encontrado em <code>{actual_file}</code>")
 
     if broken_ids:
-        logs.append(f"   └─ <span style='color:#e74c3c'>❌ Erros de destino ({len(broken_ids)}):</span>")
+        logs.append(f"   └─ <span style='font-family:monospace; color:#c0392b;'>[      FALHOU      ]</span> Erros de destino ({len(broken_ids)}):")
         for error in broken_ids:
-            logs.append(f"      ⚠️ {error}")
+            logs.append(f"      <span style='font-family:monospace; color:#c0392b;'>[      FALHOU      ]</span> {error}")
     else:
-        logs.append(f"   └─ <span style='color:#27ae60'>✅ Todos os destinos (arquivos e IDs) foram validados.</span>")
+        logs.append(f"   └─ <span style='font-family:monospace; color:#27ae60;'>[      PASSOU      ]</span> Todos os destinos (arquivos e IDs) foram validados.")
 
     # Status final da PageList
     overall_ok = len(broken_ids) == 0 and not duplicate_pages

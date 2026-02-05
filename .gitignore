@@ -3,6 +3,7 @@ epublishing/
 venv/
 .venv/
 env/
+.env
 
 # Dependencies
 
@@ -22,3 +23,9 @@ input/
 .vscode/
 .idea/
 .DS_Store
+
+# files
+*.epub
+
+# folders
+pragmatic-programming/

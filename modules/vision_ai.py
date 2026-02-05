@@ -6,8 +6,9 @@ from pathlib import Path
 from openai import OpenAI
 from playwright.sync_api import sync_playwright
 from colorama import Fore
+from config import Config
 
-client = OpenAI(base_url="http://192.168.28.70:1234/v1", api_key="lm-studio")
+client = OpenAI(base_url=Config.AI_BASE_URL, api_key=Config.AI_API_KEY)
 
 def load_prompt(key):
     """Carrega um prompt específico do arquivo prompts.txt."""
@@ -134,7 +135,7 @@ def analyze_image_with_ai(img_path, prompt):
 
         print(f"{Fore.BLUE}    [IA] Enviando captura para análise visual...")
         response = client.chat.completions.create(
-            model="qwen3-vl", 
+            model=Config.AI_MODEL, 
             messages=[{
                 "role": "user",
                 "content": [
@@ -206,7 +207,7 @@ def get_ai_tech_advice(errors):
         print(f"{Fore.BLUE}    [IA] Enviando logs para conselhos técnicos...")
         
         response = client.chat.completions.create(
-            model="qwen3-vl-8b",
+            model=Config.AI_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}

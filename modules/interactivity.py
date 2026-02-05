@@ -42,8 +42,8 @@ def validate_activities(epub_path):
                     enunciados = tree.xpath('//p[contains(@class, "_c-Atividade-Enunciado")]')
                     
                     if enunciados:
-                        logs.append(f"🛠️ <strong>Validando atividades em <code>{file_path}</code></strong>")
-                        print(f"    [INFO] Validando atividades em {file_path}")
+                        logs.append(f"<span style='font-family:monospace; color:#27ae60; font-weight:bold;'>[      PASSOU      ]</span> <strong>Atividades detectadas em <code>{file_path}</code></strong>")
+                        print(f"    [      PASSOU      ] Atividades detectadas em {file_path}")
                     
                     all_ids = set(tree.xpath('//@id'))
                     
@@ -52,7 +52,7 @@ def validate_activities(epub_path):
                         num_match = re.match(r'^(\d+)', question_text)
                         num = num_match.group(1) if num_match else None
                         
-                        logs.append(f"   🔹 Atividade {num or '?'}: \"{question_text[:60]}...\"")
+                        logs.append(f"   <span style='font-family:monospace; color:#27ae60; font-weight:bold;'>[      PASSOU      ]</span> Lendo Atividade {num or '?'}: \"{question_text[:60]}...\"")
                         
                         # Coleta contexto (elementos até o próximo enunciado)
                         context_elements = enunciando.xpath('following-sibling::*')
@@ -75,8 +75,8 @@ def validate_activities(epub_path):
                                     ids_in_js = re.findall(r"'(.*?)'", onclick)
                                     for target_id in ids_in_js:
                                         if target_id not in all_ids:
-                                            msg = f"❌ ID <code>{target_id}</code> não encontrado no arquivo (chamado em <code>showMe</code>)"
-                                            logs.append(f"      └─ <span style='color:#e74c3c'>{msg}</span>")
+                                            msg = f"ID <code>{target_id}</code> não encontrado no arquivo (chamado em <code>showMe</code>)"
+                                            logs.append(f"      <span style='font-family:monospace; font-weight:bold; color:#c0392b;'>[      FALHOU      ]</span> └─ {msg}")
                                             issues_found.append(f"{file_path}: {msg}")
                                     
                                     # Múltipla Escolha: Identifica a opção correta
@@ -93,10 +93,10 @@ def validate_activities(epub_path):
                             expected = gabarito[num]
                             if is_multiple_choice:
                                 if correct_option_found == expected:
-                                    logs.append(f"      ✅ Resposta ({correct_option_found}) bate com o Gabarito.")
+                                    logs.append(f"      <span style='font-family:monospace; font-weight:bold; color:#27ae60;'>[      PASSOU      ]</span> Resposta ({correct_option_found}) bate com o Gabarito.")
                                 else:
-                                    msg = f"❌ Divergência: HTML marca <strong>{correct_option_found}</strong>, mas Gabarito diz <strong>{expected}</strong>"
-                                    logs.append(f"      └─ <span style='color:#e74c3c'>{msg}</span>")
+                                    msg = f"Divergência: HTML marca <strong>{correct_option_found}</strong>, mas Gabarito diz <strong>{expected}</strong>"
+                                    logs.append(f"      <span style='font-family:monospace; font-weight:bold; color:#c0392b;'>[      FALHOU      ]</span> └─ {msg}")
                                     issues_found.append(f"Atividade {num}: {msg}")
                             else:
                                 # Dissertativa: Busca questaoConfira
@@ -115,10 +115,10 @@ def validate_activities(epub_path):
                                     clean_c = re.sub(r'\s+', ' ', text_confira).lower()
                                     clean_g = re.sub(r'\s+', ' ', expected).lower()
                                     if clean_g[:50] in clean_c[:100] or clean_c[:50] in clean_g[:100]:
-                                        logs.append(f"      ✅ Conteúdo 'Confira' validado com o Gabarito.")
+                                        logs.append(f"      <span style='font-family:monospace; font-weight:bold; color:#27ae60;'>[      PASSOU      ]</span> Conteúdo 'Confira' validado com o Gabarito.")
                                     else:
-                                        msg = f"❌ Conteúdo divergente no Gabarito da Atividade {num}"
-                                        logs.append(f"      └─ <span style='color:#e74c3c'>{msg}</span>")
+                                        msg = f"Conteúdo divergente no Gabarito da Atividade {num}"
+                                        logs.append(f"      <span style='font-family:monospace; font-weight:bold; color:#c0392b;'>[      FALHOU      ]</span> └─ {msg}")
                                         issues_found.append(f"Atividade {num}: {msg}")
     
         return True, logs, issues_found

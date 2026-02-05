@@ -7,8 +7,7 @@ import shutil
 import zipfile
 from pathlib import Path
 from colorama import init, Fore
-
-# Importação dos seus módulos (certifique-se que os nomes batem com os arquivos na pasta modules)
+from config import Config
 from modules.structural import check_toc_and_pagelist, get_typesetting_credit, check_filenames
 from modules.css_checker import validate_css_rules, validate_limitador_and_structures
 from modules.vision_ai import check_visual_layout, get_ai_tech_advice
@@ -17,13 +16,10 @@ from modules.link_validator import validate_external_links
 from modules.interactivity import validate_activities
 from modules.image_validator import validate_image_sizes
 
-# CONFIGURAÇÕES
-ENABLE_VISION_AI = False # Desativado por padrão
-
 init(autoreset=True)
 
 def run_epubcheck(epub_path):
-    jar_path = "epubcheck-5.1.0/epubcheck.jar"
+    jar_path = Config.EPUBCHECK_JAR
     report_json = Path(f"reports/{Path(epub_path).stem}_check.json")
     command = ["java", "-jar", jar_path, epub_path, "--json", str(report_json)]
     subprocess.run(command, check=False, capture_output=True)
@@ -123,15 +119,21 @@ def generate_html_report(epub_name, data):
 
     # Lista de ficheiros sem limitador
     missing_divs = data.get('limitador_missing', [])
-    missing_html = "".join([f"<li>{item}</li>" for item in missing_divs]) if missing_divs else "<li>✅ Todos os arquivos estão OK.</li>"
+    marker_pass = "<span style='font-family:monospace; font-weight:bold; color:#27ae60;'>[      PASSOU      ]</span>"
+    marker_fail = "<span style='font-family:monospace; font-weight:bold; color:#c0392b;'>[      FALHOU      ]</span>"
+    missing_html = "".join([f"<li>{marker_fail} {item}</li>" for item in missing_divs]) if missing_divs else f"<li>{marker_pass} Todos os arquivos estão OK.</li>"
+
+    # Riscos estruturais Binpar
+    binpar_risks = data.get('binpar_structural_risks', [])
+    binpar_html = "".join([f"<li style='color:#f39c12'><span style='font-family:monospace; font-weight:bold; color:#f39c12;'>[      AVISO       ]</span> {item}</li>" for item in binpar_risks]) if binpar_risks else f"<li>{marker_pass} Nenhuma estrutura crítica detectada.</li>"
 
     # Lista de ficheiros com nomes inválidos
     invalid_filenames = data.get('invalid_filenames', [])
-    filenames_html = "".join([f"<li style='color:var(--error)'>⚠️ {item}</li>" for item in invalid_filenames]) if invalid_filenames else "<li>✅ Todos os nomes de arquivos estão OK.</li>"
+    filenames_html = "".join([f"<li style='color:var(--error)'>{marker_fail} {item}</li>" for item in invalid_filenames]) if invalid_filenames else f"<li>{marker_pass} Todos os nomes de arquivos estão OK.</li>"
 
     # Lista de imagens com tamanho excedido
     invalid_images = data.get('invalid_images', [])
-    images_html = "".join([f"<li style='color:var(--error)'>⚠️ {item['path']} ({item['width']}x{item['height']} = {item['pixels']:,}px)</li>" for item in invalid_images]) if invalid_images else "<li>✅ Todas as imagens estão dentro do limite.</li>"
+    images_html = "".join([f"<li style='color:var(--error)'>{marker_fail} {item['path']} ({item['width']}x{item['height']} = {item['pixels']:,}px)</li>" for item in invalid_images]) if invalid_images else f"<li>{marker_pass} Todas as imagens estão dentro do limite.</li>"
 
     html = f"""
     <!DOCTYPE html>
@@ -373,16 +375,18 @@ def generate_html_report(epub_name, data):
                 <h1>{epub_name}</h1>
                 <div class="header-meta">
                     <span class="stat-label">Créditos: {data.get('typesetter', 'Não identificado')}</span>
+                </div>
+            </header>
+
+            <section class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+                    <h2 style="margin-bottom:0">01. Relatório EPubCheck</h2>
                     <div class="badge-group">
                         <span class="badge" style="background:var(--error)">{eb['FATAL'] + eb['ERROR']} Erros</span>
                         <span class="badge" style="background:var(--warning)">{eb['WARNING']} Avisos</span>
                         <span class="badge" style="background:var(--info)">{eb['USAGE']} Alertas</span>
                     </div>
                 </div>
-            </header>
-
-            <section class="card">
-                <h2>01. Relatório EPubCheck</h2>
                 <table>
                     <thead>
                         <tr>
@@ -400,7 +404,7 @@ def generate_html_report(epub_name, data):
             <section class="card">
                 <h2>02. IA Technical Advice <small>(Modelo: {data.get('ai_advice_model', 'N/A')})</small></h2>
                 <div class="ai-advice-container">
-                    {data.get('ai_advice') if data.get('ai_advice') else '✅ Nenhum erro crítico detectado para análise da IA.'}
+                    {data.get('ai_advice') if data.get('ai_advice') else f'{marker_pass} Nenhum erro crítico detectado para análise da IA.'}
                 </div>
             </section>
 
@@ -409,7 +413,7 @@ def generate_html_report(epub_name, data):
                 <div style="border-left: 2px solid var(--accent); padding-left: 20px;">
                     {''.join([f'<div style="margin-bottom: 12px; font-size: 0.95rem;">{log}</div>' for log in data.get('interactivity_logs', [])]) if data.get('interactivity_logs') else "<p>Nenhuma atividade detectada.</p>"}
                 </div>
-                {f"<div style='margin-top:25px; padding:15px; background:#fff5f5; border:1px solid #feb2b2; color:#c53030; font-weight:600;'>⚠ Falhas detectadas: {len(data['interactivity_issues'])} itens inconsistentes.</div>" if data.get('interactivity_issues') else ""}
+                {f"<div style='margin-top:25px; padding:15px; background:#fff5f5; border:1px solid #feb2b2; color:#c53030; font-weight:600;'>{marker_fail} Falhas detectadas: {len(data['interactivity_issues'])} itens inconsistentes.</div>" if data.get('interactivity_issues') else ""}
             </section>
 
             <section class="card">
@@ -425,7 +429,7 @@ def generate_html_report(epub_name, data):
                         {f'<img src="{item["image_url"]}" class="screenshot-thumb" onclick="openModal(this.src)">' if item.get('image_url') else '<p><em>Sem captura de tela.</em></p>'}
                     </div>
                     """ for item in data.get('vision_results', [])])
-                    if ENABLE_VISION_AI and data.get('vision_results') else
+                    if Config.ENABLE_VISION_AI and data.get('vision_results') else
                     '<p style="color: var(--text-muted);"><em>Análise visual desativada ou não capturada.</em></p>'
                 }
             </section>
@@ -437,25 +441,25 @@ def generate_html_report(epub_name, data):
                         <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
                             <span>Classe .limitador (40em)</span>
                             <span style="font-weight:700; color:{'#27ae60' if data['css_rules']['limitador_ok'] else '#c0392b'}">
-                                {"✅ OK" if data['css_rules']['limitador_ok'] else "❌ AUSENTE"}
+                                {"[      PASSOU      ]" if data['css_rules']['limitador_ok'] else "[      FALHOU      ]"}
                             </span>
                         </li>
                         <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
                             <span>Nomenclatura de Arquivos</span>
                             <span style="font-weight:700; color:{'#27ae60' if not invalid_filenames else '#c0392b'}">
-                                {"✅ OK" if not invalid_filenames else f"❌ {len(invalid_filenames)} ERRO(S)"}
+                                {"[      PASSOU      ]" if not invalid_filenames else f"[      FALHOU      ] ({len(invalid_filenames)})"}
                             </span>
                         </li>
                         <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
                             <span>Tamanho das Imagens (Máx 5.6M px)</span>
                             <span style="font-weight:700; color:{'#27ae60' if not invalid_images else '#c0392b'}">
-                                {"✅ OK" if not invalid_images else f"❌ {len(invalid_images)} ERRO(S)"}
+                                {"[      PASSOU      ]" if not invalid_images else f"[      FALHOU      ] ({len(invalid_images)})"}
                             </span>
                         </li>
                         <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
                             <span>Estrutura E-book</span>
                             <span style="font-weight:700; color:{'#27ae60' if data['structure_ok'] else '#e67e22'}">
-                                {"✅ ÍNTEGRA" if data['structure_ok'] else "⚠ AVISOS"}
+                                {"[      PASSOU      ]" if data['structure_ok'] else "[      AVISO       ]"}
                             </span>
                         </li>
                     </ul>
@@ -586,9 +590,9 @@ def process_single_epub(epub_path):
     eb = report_data['epubcheck']
     total_errors = eb['FATAL'] + eb['ERROR']
     if total_errors > 0:
-        print(f"{Fore.RED}    [!] EPubCheck: {total_errors} erro(s), {eb['WARNING']} aviso(s), {eb['USAGE']} alerta(s)")
+        print(f"{Fore.RED}    [      FALHOU      ] EPubCheck: {total_errors} erro(s), {eb['WARNING']} aviso(s), {eb['USAGE']} alerta(s)")
     else:
-        print(f"{Fore.GREEN}    [OK] EPubCheck: 0 erros, {eb['WARNING']} aviso(s), {eb['USAGE']} alerta(s)")
+        print(f"{Fore.GREEN}    [      PASSOU      ] EPubCheck: 0 erros, {eb['WARNING']} aviso(s), {eb['USAGE']} alerta(s)")
 
     # 2. Estrutura (TOC, NCX, PageList)
     print(f"{Fore.YELLOW}[2/8] Validando TOC, PageList e Âncoras internas...")
@@ -597,6 +601,10 @@ def process_single_epub(epub_path):
     report_data['timings']['structure'] = time.time() - s2
     report_data['structure_ok'] = structure_ok
     report_data['structure_logs'] = structure_logs
+    if structure_ok:
+        print(f"    [      PASSOU      ] Estrutura TOC/PageList validada.")
+    else:
+        print(f"    [      FALHOU      ] Problemas na estrutura detectados.")
 
     # 3. Análise de CSS
     print(f"{Fore.YELLOW}[3/8] Analisando regras nos arquivos CSS...")
@@ -619,6 +627,12 @@ def process_single_epub(epub_path):
     s5 = time.time()
     from modules.link_validator import validate_external_links
     report_data['external_links'] = asyncio.run(validate_external_links(epub_path))
+    links = report_data['external_links']
+    broken_links = [l for l in links if l['status'] != 200]
+    if broken_links:
+        print(f"{Fore.RED}    [      FALHOU      ] {len(broken_links)} links externos quebrados encontrados.")
+    else:
+        print(f"{Fore.GREEN}    [      PASSOU      ] Todos os links externos estão OK.")
     report_data['timings']['external_links'] = time.time() - s5
 
     # 6. Visão Computacional (IA Qwen3 VL)
@@ -633,25 +647,25 @@ def process_single_epub(epub_path):
     invalid_filenames = check_filenames(epub_path)
     report_data['invalid_filenames'] = invalid_filenames
     if invalid_filenames:
-        print(f"{Fore.RED}    [!] Nomes inválidos encontrados: {len(invalid_filenames)} itens")
+        print(f"{Fore.RED}    [      FALHOU      ] Nomes inválidos encontrados: {len(invalid_filenames)} itens")
         for f_name in invalid_filenames:
             print(f"{Fore.RED}        - {f_name}")
     else:
-        print(f"{Fore.GREEN}    [OK] Todos os nomes de arquivos são válidos.")
+        print(f"{Fore.GREEN}    [      PASSOU      ] Todos os nomes de arquivos são válidos.")
     report_data['timings']['filenames'] = time.time() - s_filenames
 
-    # Validação de Tamanho de Imagens
+    # Validação de Tamanho e Qualidade de Imagens
     s_images = time.time()
-    print(f"{Fore.YELLOW}[7/9] Validando dimensões das imagens (máx 5.6M px)...")
-    invalid_images = validate_image_sizes(epub_path)
-    report_data['invalid_images'] = invalid_images
-    if invalid_images:
-        print(f"{Fore.RED}    [!] Imagens excedendo limite encontradas: {len(invalid_images)} itens")
+    print(f"{Fore.YELLOW}[7/9] Validando dimensões e qualidade das imagens...")
+    image_results = validate_image_sizes(epub_path, max_pixels=Config.MAX_IMAGE_PIXELS)
+    report_data['invalid_images'] = image_results
+    if image_results:
+        print(f"{Fore.RED}    [      FALHOU      ] Imagens excedendo limite encontradas: {len(image_results)} itens")
     else:
-        print(f"{Fore.GREEN}    [OK] Todas as imagens estão dentro do limite.")
+        print(f"{Fore.GREEN}    [      PASSOU      ] Todas as imagens estão dentro do limite.")
     report_data['timings']['image_sizes'] = time.time() - s_images
 
-    if ENABLE_VISION_AI:
+    if Config.ENABLE_VISION_AI:
         print(f"{Fore.YELLOW}[8/9] Executando análise de visão computacional (Amostragem)...")
         raw_vision_results = check_visual_layout(epub_path, max_items=3)
         vision_processed = []
@@ -707,6 +721,10 @@ def process_single_epub(epub_path):
     report_data['timings']['interactivity'] = time.time() - s7
     report_data['interactivity_logs'] = inter_logs
     report_data['interactivity_issues'] = inter_issues
+    if inter_issues:
+        print(f"{Fore.RED}    [      FALHOU      ] {len(inter_issues)} falhas em atividades interativas.")
+    else:
+        print(f"{Fore.GREEN}    [      PASSOU      ] Todas as atividades interativas validadas com sucesso.")
     report_data['structure_logs'].extend(inter_logs)
 
     # Tempo total
@@ -717,8 +735,8 @@ def process_single_epub(epub_path):
     report_file = generate_html_report(epub_name, report_data)
     
     print(f"\n{Fore.GREEN}✔ Processo concluído para: {epub_name}")
-    if invalid_images:
-        print(f"{Fore.LIGHTRED_EX}👉 Alerta: {len(invalid_images)} imagens excedem o limite de pixels.")
+    if image_results:
+        print(f"{Fore.LIGHTRED_EX}👉 Alerta: {len(image_results)} imagens excedem o limite de pixels.")
     print(f"{Fore.CYAN}👉 Relatório: {report_file}")
 
 def main():

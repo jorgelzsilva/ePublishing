@@ -4,3 +4,4 @@ openai
 playwright
 beautifulsoup4
 colorama
+python-dotenv

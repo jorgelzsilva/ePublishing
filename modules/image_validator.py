@@ -1,9 +1,10 @@
 import zipfile
 import io
 from PIL import Image
+from config import Config
 from colorama import Fore
 
-def validate_image_sizes(epub_path, max_pixels=5600000):
+def validate_image_sizes(epub_path, max_pixels=Config.MAX_IMAGE_PIXELS):
     """
     Checks all images in the EPUB and returns a list of those exceeding max_pixels.
     """
