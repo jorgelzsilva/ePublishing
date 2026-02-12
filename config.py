@@ -12,9 +12,13 @@ class Config:
     
     # AI Provider Settings
     AI_PROVIDER = os.getenv("AI_PROVIDER", "lm-studio")
-    AI_BASE_URL = os.getenv("AI_BASE_URL", "http://192.168.28.70:1234/v1")
+    _raw_ai_base = os.getenv("AI_BASE_URL", "http://192.168.28.70:1234/v1")
+    if _raw_ai_base and not _raw_ai_base.startswith(("http://", "https://")):
+        AI_BASE_URL = "http://" + _raw_ai_base
+    else:
+        AI_BASE_URL = _raw_ai_base
     AI_API_KEY = os.getenv("AI_API_KEY", "lm-studio")
-    AI_MODEL = os.getenv("AI_MODEL", "qwen3-vl-8b")
+    AI_MODEL = os.getenv("AI_MODEL", "openai/gpt-oss-20b")
     
     # Feature Flags
     ENABLE_VISION_AI = os.getenv("ENABLE_VISION_AI", "False").lower() in ("true", "1", "t", "yes")

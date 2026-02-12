@@ -243,17 +243,13 @@ def check_toc_and_pagelist(epub_path):
                                         # Busca exata (normalizada)
                                         found = clean_label in clean_target
                                         
-                                        # Se não achar, tenta remover prefixos como "Capítulo 1", "Parte 1", etc.
                                         if not found:
-                                            # Remove prefix: Palavra + Número + Pontuadores opcionais (suporta acentos)
-                                            prefix_pattern = r'^(cap[ií]tulo|cap|parte|item|seç[aã]o|secao|unidade|ap[eê]ndice|apendice)\s+\d+[\s\.\-—–]*'
+                                            # Tenta remover prefixos (Capítulo X, Parte Y, etc.)
+                                            # Palavra + Número + Pontuadores opcionais
+                                            prefix_pattern = r'^(cap[ií]tulo|cap|parte|item|seç[aã]o|secao|unidade|ap[eê]ndice|apendice|t[óo]pico)\s+\d+[\s\.\-—–]*'
                                             shorter = re.sub(prefix_pattern, '', clean_label)
                                             if shorter != clean_label and shorter.strip():
                                                 found = shorter.strip() in clean_target
-                                            
-                                            # Terceira tentativa: Normalização extrema (sem espaços)
-                                            if not found:
-                                                found = norm_extreme(text_inside_a) in norm_extreme(target_text_all)
 
                                         if found:
                                             content_status = "<span style='font-family:monospace; color:#27ae60;'>[ PASSOU ]</span> (Conteúdo verificado) "
@@ -261,7 +257,7 @@ def check_toc_and_pagelist(epub_path):
                                             content_status = "<span style='font-family:monospace; color:#e74c3c;'>[ FALHOU ]</span> (⚠️ Texto não encontrado!) "
                                             label_content_errors.append({
                                                 "label": text_inside_a,
-                                                "file": clean_target
+                                                "file": actual_file_in_zip  # Mantém a correção do log (nome do arquivo)
                                             })
                                     else:
                                         content_status = "<small style='color:#bdc3c7'>(Texto curto, conteúdo ignorado)</small> "
