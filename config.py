@@ -32,3 +32,6 @@ class Config:
     MAX_IMAGE_PIXELS = int(os.getenv("MAX_IMAGE_PIXELS", "5600000"))
     IMAGE_QUALITY_TOLERANCE = int(os.getenv("IMAGE_QUALITY_TOLERANCE", "2"))
     IMAGE_QUALITY_THRESHOLD = float(os.getenv("IMAGE_QUALITY_THRESHOLD", "0.45"))
+
+    # Table Validation (Kindle/KDP rejects tables with more than 20,000 characters)
+    MAX_TABLE_CHARS = int(os.getenv("MAX_TABLE_CHARS", "20000"))
