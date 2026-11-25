@@ -16,6 +16,12 @@ import asyncio
 from modules.link_validator import validate_external_links
 from modules.interactivity import validate_activities
 from modules.image_validator import validate_image_sizes
+from modules.table_validator import find_large_tables
+from html import escape as html_escape
+
+import sys
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 init(autoreset=True)
 
@@ -148,6 +154,10 @@ def generate_html_report(epub_name, data):
     # Lista de imagens com tamanho excedido
     invalid_images = data.get('invalid_images', [])
     images_html = "".join([f"<li style='color:var(--error)'>{marker_fail} {item['path']} ({item['width']}x{item['height']} = {item['pixels']:,}px)</li>" for item in invalid_images]) if invalid_images else f"<li>{marker_pass} Todas as imagens estão dentro do limite.</li>"
+
+    # Tabelas acima do limite de caracteres do Kindle
+    large_tables = data.get('large_tables', [])
+    tables_html = "".join([f"<li style='color:var(--error)'>{marker_fail} {t['file']} (linha {t['line']}, tabela {t['table']}{' #' + t['id'] if t['id'] else ''}): {t['chars']:,} caracteres <em>“{html_escape(t['preview'])}…”</em></li>" for t in large_tables]) if large_tables else f"<li>{marker_pass} Todas as tabelas estão dentro do limite.</li>"
 
     # Filtro de Terminal Logs
     filtered_logs = []
@@ -479,6 +489,12 @@ def generate_html_report(epub_name, data):
                             </span>
                         </li>
                         <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                            <span>Tamanho das Tabelas (Máx {Config.MAX_TABLE_CHARS:,} caracteres – Kindle)</span>
+                            <span style="font-weight:700; color:{'#27ae60' if not large_tables else '#c0392b'}">
+                                {"[      PASSOU      ]" if not large_tables else f"[      FALHOU      ] ({len(large_tables)})"}
+                            </span>
+                        </li>
+                        <li style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
                             <span>{structure_title}</span>
                             <span style="font-weight:700; color:{'#27ae60' if data['structure_ok'] else '#f39c12'}">
                                 {"[      PASSOU      ]" if data['structure_ok'] else "[      AVISO       ]"}
@@ -498,6 +514,13 @@ def generate_html_report(epub_name, data):
                         <div style="max-height: 120px; overflow-y: auto; font-size: 0.85rem; border: 1px solid var(--border); padding: 10px; background: #fffcfc;">
                             <ul style="list-style: none;">
                                 {images_html}
+                            </ul>
+                        </div>
+
+                        <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin: 15px 0 10px;">Tabelas Excedendo Limite (Kindle)</h4>
+                        <div style="max-height: 120px; overflow-y: auto; font-size: 0.85rem; border: 1px solid var(--border); padding: 10px; background: #fffcfc;">
+                            <ul style="list-style: none;">
+                                {tables_html}
                             </ul>
                         </div>
                     </div>
@@ -758,6 +781,18 @@ def process_single_epub(epub_path):
         print(f"{Fore.GREEN}    [      PASSOU      ] Todas as imagens estão dentro do limite.")
     report_data['timings']['image_sizes'] = time.time() - s_images
 
+    step += 1
+    # Tabelas acima do limite do Kindle (erro bloqueante na KDP)
+    print(f"{Fore.YELLOW}[{step}] Verificando tamanho das tabelas (Kindle: máx {Config.MAX_TABLE_CHARS:,} caracteres)...")
+    large_tables = find_large_tables(epub_path)
+    report_data['large_tables'] = large_tables
+    if large_tables:
+        print(f"{Fore.RED}    [      FALHOU      ] {len(large_tables)} tabela(s) acima de {Config.MAX_TABLE_CHARS:,} caracteres:")
+        for t in large_tables:
+            print(f"{Fore.RED}        - {t['file']} (linha {t['line']}, tabela {t['table']}{' #' + t['id'] if t['id'] else ''}): {t['chars']:,} caracteres")
+    else:
+        print(f"{Fore.GREEN}    [      PASSOU      ] Todas as tabelas estão dentro do limite.")
+
     if is_secad:
         step += 1
         # 8. Atividades Interativas e Gabarito
@@ -787,6 +822,8 @@ def process_single_epub(epub_path):
     print(f"\n{Fore.GREEN}✔ Processo concluído para: {epub_name}")
     if image_results:
         print(f"{Fore.LIGHTRED_EX}👉 Alerta: {len(image_results)} imagens excedem o limite de pixels.")
+    if large_tables:
+        print(f"{Fore.LIGHTRED_EX}👉 Erro: {len(large_tables)} tabela(s) acima de {Config.MAX_TABLE_CHARS:,} caracteres — o Kindle não aceita. Divida em tabelas menores.")
     print(f"{Fore.CYAN}👉 Relatório: {report_file}")
 
 def main():
